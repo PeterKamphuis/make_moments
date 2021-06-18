@@ -6,4 +6,10 @@ A stand alone version of the pyFAT make_moments function. The function can be im
 use as:
   make_moments filename=Cub.fits mask=mask.fits
 
-or type -h for other options.
+If the maps already exist add overwrite=True
+
+For an overview of the possible inout type make_moments -e to print the default yaml file.
+
+to configure setting from a yaml file 
+
+  make_moments -c my_input_file.yml
