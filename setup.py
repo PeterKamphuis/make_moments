@@ -15,7 +15,7 @@ requirements = [
     'importlib_resources>=3.3.0',
 ]
 
-PACKAGE_NAME = 'moments'
+PACKAGE_NAME = 'make_moments'
 __version__ = '0.1.0'
 
 
@@ -37,13 +37,13 @@ setup(name=PACKAGE_NAME,
       include_package_data=False,
       # package_data - any binary or meta data files should go into MANIFEST.in
       scripts=["bin/" + j for j in os.listdir("bin")],
-      license=["GNU GPL v3"],
+      license="GNU GPL v3",
       classifiers=[
-          "Development Status :: Beta",
+          "Development Status :: 4 - Beta",
           "Intended Audience :: Science/Research",
           "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
           "Operating System :: POSIX :: Linux",
-          "Programming Language :: Python 3",
+          "Programming Language :: Python :: 3",
           "Topic :: Scientific/Engineering :: Astronomy"
       ]
       )

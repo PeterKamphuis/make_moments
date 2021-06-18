@@ -4,7 +4,7 @@
 
 #from optparse import OptionParser
 from omegaconf import OmegaConf,MissingMandatoryValue
-from moments.config_defaults import defaults
+from make_moments.config_defaults import defaults
 from astropy.io import fits
 import numpy as np
 import copy
