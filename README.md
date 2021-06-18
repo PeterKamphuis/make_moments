@@ -4,4 +4,6 @@ A stand alone version of the pyFAT make_moments function. The function can be im
   pip install make_moments
 
 use as:
-  moments filename=Cub.fits mask=mask.fits
+  make_moments filename=Cub.fits mask=mask.fits
+
+or type -h for other options.
