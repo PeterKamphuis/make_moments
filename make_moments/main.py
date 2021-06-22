@@ -4,6 +4,7 @@
 
 #from optparse import OptionParser
 from omegaconf import OmegaConf,MissingMandatoryValue
+import make_moments
 from make_moments.config_defaults import defaults
 from astropy.io import fits
 import numpy as np
@@ -59,29 +60,36 @@ print_log.__doc__ =f'''
     This is useful for testing functions.
 '''
 
-def moments(filename = None, mask_cube = None, moments = [0,1,2],
-                 overwrite = False, level=None,vel_unit= None, threshold = 3.,
+def moments(filename = None, mask = None, moments = [0,1,2],
+                 overwrite = False, level=None,velocity_unit= None, threshold = 3.,
                   debug = False, log=None,output_directory = None,output_name =None):
+
+    if not filename:
+        InputError("There is no default for filename, it needs be sets to the input cube fits file.")
+
+    if not mask and not level and not threshold:
+        InputError("Moments requires a threshold (sigma), level (units of input cube) or a mask. ")
+
+
     if not output_directory:
         output_directory= f'{os.getcwd()}'
     if not output_name:
         output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}'
-
     cube = fits.open(filename)
-    if vel_unit:
-        cube[0].header['CUNIT3'] = vel_unit
-    if mask_cube:
-        mask = fits.open(mask_cube)
-        if len(np.where(mask[0].data > 0.5)[0]) < 1:
+    if velocity_unit:
+        cube[0].header['CUNIT3'] = velocity_unit
+    if mask:
+        mask_cube = fits.open(mask)
+        if len(np.where(mask_cube[0].data > 0.5)[0]) < 1:
            raise InputError(f'We expect mask values to start at 1 your mask has no values above 0.5')
 
-        if mask[0].header['NAXIS1'] != cube[0].header['NAXIS1'] or \
-           mask[0].header['NAXIS2'] != cube[0].header['NAXIS2'] or \
-           mask[0].header['NAXIS3'] != cube[0].header['NAXIS3']:
+        if mask_cube[0].header['NAXIS1'] != cube[0].header['NAXIS1'] or \
+           mask_cube[0].header['NAXIS2'] != cube[0].header['NAXIS2'] or \
+           mask_cube[0].header['NAXIS3'] != cube[0].header['NAXIS3']:
            raise InputError(f'Your mask {mask_cube} and cube {filename} do not have the same dimensions')
         with np.errstate(invalid='ignore', divide='ignore'):
-            cube[0].data[mask[0].data < 0.5] = float('NaN')
-        mask.close()
+            cube[0].data[mask_cube[0].data < 0.5] = float('NaN')
+        mask_cube.close()
     else:
         if not level:
             level = threshold*np.mean([np.nanstd(cube[0].data[0:2,:,:]),np.nanstd(cube[0].data[-3:-1,:,:])])
@@ -150,17 +158,16 @@ moments.__doc__ =f'''
     Make the moment maps
 
  CATEGORY:
-    fits_functions
+    Spectral line cube manipulations.
 
  INPUTS:
-
+    filename = input file name
 
 
  OPTIONAL INPUTS:
-    debug = False
+    mask = name of the cube to be used as a mask
 
-    fit_type = 'Undefined'
-    type of ftting
+    debug = False
 
     moments = [0,1,2]
     moment maps to create
@@ -171,8 +178,21 @@ moments.__doc__ =f'''
     level=None
     cutoff level to use, if set the mask will not be used
 
-    vel_unit= none
+    velocity_unit= none
     velocity unit of the input cube
+
+    threshold = 3.
+    Cutoff level in terms of sigma, if used the std in in the first two and last channels in the cube is measured and multiplied.
+
+    log = None
+    Name for a logging file
+
+    output_directory = None
+    Name of the directory where to put the created maps. If none the current working directory is used.
+
+    output_name = None
+    Base name for output maps i.e. maps are output_name_mom#.fits with # number of the moments
+    default is filename -.fits
 
  OUTPUTS:
 
@@ -184,17 +204,24 @@ moments.__doc__ =f'''
  NOTE:
 '''
 
+
 def main(argv):
+    if '-v' in argv or '--version' in argv:
+        print(f"This is version {make_moments.__version__} of the program.")
+        sys.exit()
+
     if '-h' in argv or '--help' in argv:
         print('''
-Use moments in this way:
-moments -c inputfile.yml   where inputfile is a yaml config file with the desired input settings.
-moments -h print this message
-moments -e prints a yaml file (defaults.yml) with the default setting in the current working directory.
+Use make_moments in this way:
+make_moments -c inputfile.yml   where inputfile is a yaml config file with the desired input settings.
+make_moments -h print this message
+make_moments -e prints a yaml file (defaults.yml) with the default setting in the current working directory.
 in this file values designated ??? indicated values without defaults.
 
-All config parametere can be set directly from the command line by setting the correct parameters, e.g:
-moments filename=cube.fits mask=mask.fits to make moment maps of the file cube.fits where the maps are masked with mask.fits
+
+
+All config parameters can be set directly from the command line by setting the correct parameters, e.g:
+make_moments filename=cube.fits mask=mask.fits to make moment maps of the file cube.fits where the maps are masked with mask.fits
 ''')
         sys.exit()
 
@@ -220,8 +247,8 @@ Exiting moments.''')
         print_log(f'''You have to specify a mask, cutoff level (in cube units), or threshold (in sigma) to mask the cube with''')
         sys.exit(1)
 
-    moments(filename = cfg.filename, mask_cube = cfg.mask, moments = cfg.moments,
-                     overwrite = cfg.overwrite, level= cfg.level,vel_unit= cfg.velocity_unit, threshold = cfg.threshold,
+    moments(filename = cfg.filename, mask = cfg.mask, moments = cfg.moments,
+                     overwrite = cfg.overwrite, level= cfg.level,velocity_unit= cfg.velocity_unit, threshold = cfg.threshold,
                       debug = cfg.debug, log=cfg.log,output_directory = cfg.output_directory,output_name = cfg.output_name)
 
 if __name__ =="__main__":
