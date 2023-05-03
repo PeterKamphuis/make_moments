@@ -60,10 +60,11 @@ print_log.__doc__ =f'''
     This is useful for testing functions.
 '''
 
-def moments(filename = None, mask = None, moments = [0,1,2],
-                 overwrite = False, level=None,velocity_unit= None, threshold = 3.,
-                  debug = False, log=None,output_directory = None,output_name =None):
-
+def moments(filename = None, mask = None, moments = None,overwrite = False,\
+            level=None,velocity_unit= None, threshold = 3.,debug = False, \
+            log=None,output_directory = None,output_name =None):
+    if moments is None:
+        moments = [0,1,2]
     if not filename:
         InputError("There is no default for filename, it needs be sets to the input cube fits file.")
 
@@ -251,5 +252,6 @@ Exiting moments.''')
                      overwrite = cfg.overwrite, level= cfg.level,velocity_unit= cfg.velocity_unit, threshold = cfg.threshold,
                       debug = cfg.debug, log=cfg.log,output_directory = cfg.output_directory,output_name = cfg.output_name)
 
-if __name__ =="__main__":
+if __nam
+e__ =="__main__":
     main()
