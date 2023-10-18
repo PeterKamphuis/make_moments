@@ -252,6 +252,5 @@ Exiting moments.''')
                      overwrite = cfg.overwrite, level= cfg.level,velocity_unit= cfg.velocity_unit, threshold = cfg.threshold,
                       debug = cfg.debug, log=cfg.log,output_directory = cfg.output_directory,output_name = cfg.output_name)
 
-if __nam
-e__ =="__main__":
+if __name__ =="__main__":
     main()
