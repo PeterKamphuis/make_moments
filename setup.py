@@ -10,13 +10,14 @@ except ImportError as e:
 requirements = [
     'numpy>=1.14',
     'omegaconf',
+    'scipy',
     'astropy',
     'future-fstrings',
     'importlib_resources>=3.3.0',
 ]
 
 PACKAGE_NAME = 'make_moments'
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 
 with open("README.md", "r") as fh:
