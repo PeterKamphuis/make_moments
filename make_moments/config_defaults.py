@@ -26,7 +26,8 @@ def get_config(moments_default=True,PV_default=False):
             PA: float = 16
             center: List = field(default_factory=lambda: [0.,0.,0.])
             finalsize: List= field(default_factory=lambda: [-1,-1,-1])
-            convert: float = 1.
+            convert: float = -1.
+            restfreq: float = 1.420405751767E+09 #hz
 
     cfg = OmegaConf.structured(defaults)
     return cfg

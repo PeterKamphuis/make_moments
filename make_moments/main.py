@@ -318,7 +318,7 @@ set_limits.__doc__ =f'''
 
 # Extract a PV-Diagrams
 def extract_pv(filename = None,overwrite = False,velocity_unit= None,\
-        PA=0.,center= None,finalsize=None,convert=-1,log = None,\
+        PA=0.,center= None,finalsize=None,convert=-1,log = None, restfreq = 1.420405751767E+09,\
         output_directory = None,output_name =None,debug =False):
     if center is None:
         center=[-1,-1,-1]
@@ -438,14 +438,78 @@ def extract_pv(filename = None,overwrite = False,velocity_unit= None,\
     del (TwoD_hdr['CDELT3'])
     del (TwoD_hdr['CTYPE3'])
     del (TwoD_hdr['NAXIS3'])
+    del (TwoD_hdr['EPOCH'])
+
     TwoD_hdr['NAXIS'] = 2
     TwoD_hdr['CRVAL1'] = 0.
     #Because we used nx in the linspace for liney we also use it here
     TwoD_hdr['CDELT1'] = np.sqrt(((x2-x1)*abs(hdr['CDELT1'])/nx)**2+((y2-y1)*abs(hdr['CDELT2'])/nx)**2)*3600.
-
     TwoD_hdr['CTYPE1'] = 'OFFSET'
-    TwoD_hdr['CUNIT1'] = 'ARCSEC'
+    TwoD_hdr['CUNIT1'] = 'arcsec'
     TwoD_hdr['HISTORY'] = f'EXTRACT_PV: PV diagram extracted with angle {PA} and center {center}'
+    # Ensure the header is Carta compliant
+    if 'RESTFRQ' not in TwoD_hdr:
+        if 'RESTFREQ' in TwoD_hdr:
+            TwoD_hdr['RESTFRQ'] =  TwoD_hdr['RESTFREQ'] 
+        else:
+            TwoD_hdr['RESTFRQ'] = restfreq
+    if 'SPECSYS3' in TwoD_hdr:
+        TwoD_hdr['SPECSYS2'] =  TwoD_hdr['SPECSYS3']
+        TwoD_hdr['SPECSYS'] =  TwoD_hdr['SPECSYS3']
+        
+        del (TwoD_hdr['SPECSYS3'])
+    elif 'SPECSYS' in TwoD_hdr:
+        TwoD_hdr['SPECSYS2'] =  TwoD_hdr['SPECSYS'] 
+        
+
+    if TwoD_hdr['CTYPE2'] not in ['VRAD','VOPT','FREQ']:
+        TwoD_hdr['CTYPE2'] = 'VRAD'
+    compliant = {}
+    compliant['SIMPLE']  =                    'T' #Standard FITS                                   
+    compliant['BITPIX']   =                  -32 #Floating point (32 bit)                         
+    compliant['NAXIS']    =                    2                                                  
+    compliant['NAXIS1']   =                  259                                                  
+    compliant['NAXIS2']   =                  111                                                  
+    compliant['EXTEND']   =                    'T'                                                  
+    compliant['BSCALE']   =   1.000000000000E+00 #PHYSICAL = PIXEL*BSCALE + BZERO                 
+    compliant['BZERO']    =   0.000000000000E+00                                                  
+    compliant['BMAJ']     =   3.397222222222E-03                                                  
+    compliant['BMIN']     =   2.655555555556E-03                                                  
+    compliant['BPA']      =   -3.830000000000E+01                                                  
+    compliant['BTYPE']    = 'Intensity'                                                           
+    compliant['OBJECT']   = ' '                                                            
+    compliant['BUNIT']    = 'Jy/beam '           #Brightness (pixel) unit                         
+    compliant['PC1_1']    =   1.000000000000E+00                                                  
+    compliant['PC2_1']    =   0.000000000000E+00                                                  
+    compliant['PC1_2']    =   0.000000000000E+00                                                  
+    compliant['PC2_2']    =   1.000000000000E+00                                                  
+    compliant['CTYPE1']   = 'OFFSET '
+    compliant['CRVAL1']   =   0.000000000000E+00                                                  
+    compliant['CDELT1']   =   3.333334109986E-02                                                  
+    compliant['CRPIX1']   =   1.300000000000E+02                                                  
+    compliant['CUNIT1']   = 'arcmin  '  
+    compliant['CTYPE2']   = 'FREQ    '                                                            
+    compliant['CRVAL2']   =   1.416980879009E+09                                                  
+    compliant['CDELT2']   =  -6.510169336536E+03                                                 
+    compliant['CRPIX2']   =   1.000000000000E+00                                                  
+    compliant['CUNIT2']   = 'Hz      '                                                            
+    compliant['RESTFRQ']  =   1.420405751767E+09 #Rest Frequency (Hz)                             
+    compliant['DATE']     = '2023-09-27T14:24:56.191625' #Date FITS file was written              
+    compliant['TIMESYS']  = 'UTC     '          #Time system for HDU                             
+    compliant['ORIGIN']   = 'casacore-3.4.0'                 
+
+    for key in TwoD_hdr:
+        if key in compliant:
+            print(f'ori = {TwoD_hdr[key]} , casa compliant {compliant[key]}')
+            compliant.pop(key)
+        else:
+            print(f'The key {key} has no counterpart in compliant, (={TwoD_hdr[key]})')
+
+    for key in compliant:
+        print(f'{key} = {compliant[key]}')
+
+
+
     # Then we change the cube and rteturn the PV construct
     cube[0].header = TwoD_hdr
     cube[0].data = PV
@@ -547,6 +611,7 @@ Exiting moments.''')
                     center= cfg.center,finalsize=cfg.finalsize,\
                     convert= cfg.convert,log = cfg.log,\
                     output_directory = cfg.output_directory,
+                    restfreq=cfg.restfreq,
                     output_name =cfg.output_name ,debug =cfg.debug)
 
 
