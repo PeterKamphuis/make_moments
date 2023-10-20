@@ -27,7 +27,9 @@ def get_config(moments_default=True,PV_default=False):
             center: List = field(default_factory=lambda: [0.,0.,0.])
             finalsize: List= field(default_factory=lambda: [-1,-1,-1])
             convert: float = -1.
+            carta: bool = False #Carta will only accept stupid fequency axis
             restfreq: float = 1.420405751767E+09 #hz
+            spectral_frame: str = 'BARYCENT'
 
     cfg = OmegaConf.structured(defaults)
     return cfg

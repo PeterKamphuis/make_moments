@@ -14,10 +14,11 @@ requirements = [
     'astropy',
     'future-fstrings',
     'importlib_resources>=3.3.0',
+    'importlib_metadata',
 ]
 
 PACKAGE_NAME = 'make_moments'
-__version__ = '1.0.1'
+__version__ = '1.0.0'
 
 
 with open("README.md", "r") as fh:
