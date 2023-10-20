@@ -1,2 +1,3 @@
-include make_moments/bin/moments
-recursive-include moments/ *.pyAnd did you check the dirty beam
+include make_moments/bin/make_moments
+include make_moments/bin/create_PV_diagram
+recursive-include make_moments/ *.py

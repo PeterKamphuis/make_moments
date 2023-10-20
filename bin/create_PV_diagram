@@ -4,5 +4,5 @@
 import make_moments.main as main
 import sys
 
-main.main(sys.argv[1:])
+main.main(sys.argv[1:],create_PV = True,make_moments=False)
 #main.main()
