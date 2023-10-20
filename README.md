@@ -19,7 +19,7 @@ to configure setting from a yaml file
 
 To use in python script:
 
-from make_moments.main import moments
+from make_moments.functions import moments
 
 And then use the moments() function
 
@@ -33,6 +33,6 @@ to configure setting from a yaml file
 
 To use in python script:
 
-from make_moments.main import pv_diagram
+from make_moments.functions import pv_diagram
 
 And then use the pv_diagram() function
