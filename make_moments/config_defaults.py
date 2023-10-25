@@ -1,7 +1,6 @@
 # -*- coding: future_fstrings -*-
 
 from dataclasses import dataclass,field
-import omegaconf
 from omegaconf import MISSING,OmegaConf,MissingMandatoryValue
 from typing import List,Optional
 import os

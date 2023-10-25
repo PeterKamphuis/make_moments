@@ -74,7 +74,7 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
             coordinate_frame = WCS(hdr)
         
         xcenter,ycenter,zcenter = coordinate_frame.wcs_world2pix(center[0], center[1], center[2], 1.)
-       
+   
     nz, ny, nx = data.shape
     if finalsize[0] != -1:
         if finalsize[1] >nz:
@@ -89,13 +89,21 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
 {'':8s} nx = {nx}
 ''', log)
     x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[hdr['NAXIS1'],hdr['NAXIS2']])
-  
+   
     linex,liney,linez = np.linspace(x1,x2,nx), np.linspace(y1,y2,nx), np.linspace(0,nz-1,nz)
     #We need to find our center in these coordinates
-    offset = [(x-xcenter+y-ycenter) for x,y in zip (linex,liney)]
+    if x1 > x2 and y1 > y2:
+        offset = [(xcenter-x+ycenter-y) for x,y in zip (linex,liney)]
+    elif x1 < x2 and y1 > y2:
+        offset = [(x-xcenter+ycenter-y) for x,y in zip (linex,liney)]
+    elif x1 > x2 and y1 < y2:
+        offset = [(xcenter-x+y-ycenter) for x,y in zip (linex,liney)]
+    else:
+        offset = [(x-xcenter+y-ycenter) for x,y in zip (linex,liney)]
+    
     offset_abs = [abs(x) for x in offset]
     centralpix = offset_abs.index(np.min(offset_abs))
-
+   
     if offset[centralpix] > 0:
         xc1 =  centralpix-1
         yc1 = offset[centralpix-1]
@@ -208,7 +216,7 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
                 spectral_frame  = 'BARYCENT'
         TwoD_hdr['SPECSYS2'] = spectral_frame
     spectral_frame = TwoD_hdr['SPECSYS2']
-    TwoD_hdr['CTYPE2'] = 'VRAD'
+    
     if carta and TwoD_hdr['CTYPE2'] != 'FREQ' :    
         #As carta is not fits standard compliant  and generally ridiculous there are a set of ridicul;ous demands on viewing the coordinate system
         # it wants a specsys even though fits standard says this is a axis specific keyword
@@ -224,16 +232,7 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
             TwoD_hdr['CDELT2'] = -restfreq * float(TwoD_hdr['CDELT2']) / c 
             TwoD_hdr['CRVAL2'] = restfreq * \
                 (1 - float(TwoD_hdr['CRVAL2']) / c)
-            '''    
-        elif TwoD_hdr['CTYPE2'] == 'VOPT':
-            TwoD_hdr['CDELT2'] = -restfreq * float(TwoD_hdr['CDELT2']) / c 
-            TwoD_hdr['CRVAL2'] = restfreq * \
-                (1 - float(TwoD_hdr['CRVAL2']) / c)
-        elif TwoD_hdr['CTYPE2'] == 'VELO':
-            TwoD_hdr['CDELT2'] = -restfreq * float(TwoD_hdr['CDELT2']) / c 
-            TwoD_hdr['CRVAL2'] = restfreq * \
-                (1 - float(TwoD_hdr['CRVAL2']) / c)
-            '''
+       
         else:
             print(f'AS only the radio definition leads to equal increments in frequency we dont know how to make your PV-Diagram compliant')
         TwoD_hdr['CUNIT2'] = 'hz'
