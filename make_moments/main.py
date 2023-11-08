@@ -58,6 +58,7 @@ make_moments filename=cube.fits mask=mask.fits to make moment maps of the file c
         print(f'''We have printed the file default.yml in {os.getcwd()}.
 Exiting moments.''')
         sys.exit()
+        
     if '-c' in argv:
         configfile = argv[argv.index('-c')+1]
         inputconf = OmegaConf.load(configfile)

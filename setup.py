@@ -18,7 +18,7 @@ requirements = [
 ]
 
 PACKAGE_NAME = 'make_moments'
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 
 with open("README.md", "r") as fh:
@@ -36,7 +36,7 @@ setup(name=PACKAGE_NAME,
       packages=[PACKAGE_NAME],
       python_requires='>=3.6',
       install_requires=requirements,
-      include_package_data=False,
+      include_package_data=True,
       # package_data - any binary or meta data files should go into MANIFEST.in
       scripts=["bin/" + j for j in os.listdir("bin")],
       license="GNU GPL v3",
