@@ -30,7 +30,6 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 
 def main(argv,makemoments=True,create_PV = False):
     if '-v' in argv or '--version' in argv:
-        print('why ')
         print(f"This is version {make_moments.__version__} of the program.")
         sys.exit()
 
