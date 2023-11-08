@@ -9,7 +9,8 @@ from make_moments.functions import extract_pv,moments
 from astropy.io import fits
 
 import numpy as np
-import copy
+import make_moments
+
 import sys
 import os
 import traceback
@@ -27,8 +28,9 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
 
 
 
-def main(argv,make_moments=True,create_PV = False):
+def main(argv,makemoments=True,create_PV = False):
     if '-v' in argv or '--version' in argv:
+        print('why ')
         print(f"This is version {make_moments.__version__} of the program.")
         sys.exit()
 
@@ -50,7 +52,7 @@ make_moments filename=cube.fits mask=mask.fits to make moment maps of the file c
 
 
 
-    cfg = get_config(moments_default=make_moments,PV_default=create_PV)
+    cfg = get_config(moments_default=makemoments,PV_default=create_PV)
 
     if '-e' in argv:
         with open('default.yml','w') as default_write:
@@ -70,7 +72,7 @@ Exiting moments.''')
     inputconf = OmegaConf.from_cli(argv)
     cfg = OmegaConf.merge(cfg,inputconf)
     
-    if make_moments:
+    if makemoments:
         if not cfg.mask and not cfg.level and not cfg.threshold:
             print(f'''You have to specify a mask, cutoff level (in cube units), or threshold (in sigma) to mask the cube with''')
             sys.exit(1)
