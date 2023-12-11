@@ -45,7 +45,7 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
         close = True
     if velocity_unit:
         cube[0].header['CUNIT3'] = velocity_unit
-    log_statement += print_log(f'''EXTRACT_PV: We are the extraction of a PV-Diagram
+    log_statement += print_log(f'''EXTRACT_PV: We are starting the extraction of a PV-Diagram
 {'':8s} PA = {PA}
 {'':8s} center = {center}
 {'':8s} finalsize = {finalsize}
@@ -74,7 +74,9 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
             coordinate_frame = WCS(hdr)
         
         xcenter,ycenter,zcenter = coordinate_frame.wcs_world2pix(center[0], center[1], center[2], 1.)
-   
+    print_log(f'''EXTRACT_PV: We get these pixels for the center,
+xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}              
+''', log)
     nz, ny, nx = data.shape
     if finalsize[0] != -1:
         if finalsize[1] >nz:
@@ -89,8 +91,10 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
 {'':8s} nx = {nx}
 ''', log)
     x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[hdr['NAXIS1'],hdr['NAXIS2']])
+
    
     linex,liney,linez = np.linspace(x1,x2,nx), np.linspace(y1,y2,nx), np.linspace(0,nz-1,nz)
+
     #We need to find our center in these coordinates
     if x1 > x2 and y1 > y2:
         offset = [(xcenter-x+ycenter-y) for x,y in zip (linex,liney)]
@@ -100,10 +104,13 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
         offset = [(xcenter-x+y-ycenter) for x,y in zip (linex,liney)]
     else:
         offset = [(x-xcenter+y-ycenter) for x,y in zip (linex,liney)]
-    
+    #for i in range(len(linex)):
+    #    print(f'{linex[i]} {i} {xcenter}  {liney[i]} {ycenter} {offset[i]}')
     offset_abs = [abs(x) for x in offset]
     centralpix = offset_abs.index(np.min(offset_abs))
-   
+    print_log(f'''EXTRACT_PV: In our map coordinates we find the central pixels to be
+cpix = {centralpix} value = {linex[centralpix]}
+''', log)
     if offset[centralpix] > 0:
         xc1 =  centralpix-1
         yc1 = offset[centralpix-1]
@@ -116,9 +123,10 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
         yc2 = offset[centralpix+1]
   
     xcen = xc1+(xc2-xc1)*(-yc1/(yc2-yc1))
-    if PA > 180.:
+    #if PA < 180.:
+    if y1 > y2:
         xcen= nx-xcen
-   
+  
 
 
     #This only works when ny == nx hence nx is used in liney
@@ -142,8 +150,8 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
     else:
         zstart = set_limits(int(zcenter-finalsize[1]/2.),0,int(nz))
         zend = set_limits(int(zcenter+finalsize[1]/2.),0,int(nz))
-        xstart = set_limits(int(xcenter-finalsize[0]/2.),0,int(nx))
-        xend = set_limits(int(xcenter+finalsize[0]/2.),0,int(nx))
+        xstart = set_limits(int(xcen-finalsize[0]/2.),0,int(nx))
+        xend = set_limits(int(xcen+finalsize[0]/2.),0,int(nx))
 
         PV =  PV[zstart:zend, xstart:xend]
         TwoD_hdr['NAXIS2'] = int(finalsize[1])
