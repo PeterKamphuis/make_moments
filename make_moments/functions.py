@@ -94,7 +94,7 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
 
    
     linex,liney,linez = np.linspace(x1,x2,nx), np.linspace(y1,y2,nx), np.linspace(0,nz-1,nz)
-    print(linex)
+
     #We need to find our center in these coordinates
     if x1 > x2 and y1 > y2:
         offset = [(xcenter-x+ycenter-y) for x,y in zip (linex,liney)]
@@ -104,8 +104,8 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
         offset = [(xcenter-x+y-ycenter) for x,y in zip (linex,liney)]
     else:
         offset = [(x-xcenter+y-ycenter) for x,y in zip (linex,liney)]
-    for i in range(len(linex)):
-        print(f'{linex[i]} {i} {xcenter}  {liney[i]} {ycenter} {offset[i]}')
+    #for i in range(len(linex)):
+    #    print(f'{linex[i]} {i} {xcenter}  {liney[i]} {ycenter} {offset[i]}')
     offset_abs = [abs(x) for x in offset]
     centralpix = offset_abs.index(np.min(offset_abs))
     print_log(f'''EXTRACT_PV: In our map coordinates we find the central pixels to be
@@ -151,7 +151,6 @@ cpix = {centralpix} value = {linex[centralpix]}
         zstart = set_limits(int(zcenter-finalsize[1]/2.),0,int(nz))
         zend = set_limits(int(zcenter+finalsize[1]/2.),0,int(nz))
         xstart = set_limits(int(xcen-finalsize[0]/2.),0,int(nx))
-        print(xstart)
         xend = set_limits(int(xcen+finalsize[0]/2.),0,int(nx))
 
         PV =  PV[zstart:zend, xstart:xend]
