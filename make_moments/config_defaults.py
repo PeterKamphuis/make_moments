@@ -29,6 +29,7 @@ def get_config(moments_default=True,PV_default=False):
             carta: bool = False #Carta will only accept stupid fequency axis
             restfreq: float = 1.420405751767E+09 #hz
             spectral_frame: str = 'BARYCENT'
+            velocity_type: Optional[str] = None
 
     cfg = OmegaConf.structured(defaults)
     return cfg

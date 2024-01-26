@@ -23,7 +23,7 @@ def print_log(log_statement,log=False):
 
 # Extract a PV-Diagrams
 def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None,log = False,\
-        PA=0.,center= None,finalsize=None,convert=-1,restfreq = None,silent=False,\
+        PA=0.,center= None,finalsize=None,convert=-1,restfreq = None,silent=False,velocity_type= None,\
         output_directory = None,output_name =None,debug =False, spectral_frame= None, carta=False):
     log_statement = ''
     if center is None:
@@ -45,6 +45,8 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
         close = True
     if velocity_unit:
         cube[0].header['CUNIT3'] = velocity_unit
+    if not velocity_type is None:
+        cube[0].header['CTYPE3'] = velocity_type
     log_statement += print_log(f'''EXTRACT_PV: We are starting the extraction of a PV-Diagram
 {'':8s} PA = {PA}
 {'':8s} center = {center}

@@ -89,6 +89,7 @@ Exiting moments.''')
                     convert= cfg.convert,log = cfg.log,\
                     output_directory = cfg.output_directory,
                     restfreq=cfg.restfreq,carta=cfg.carta,
+                    velocity_type = cfg.velocity_type,
                     spectral_frame=cfg.spectral_frame,
                     output_name =cfg.output_name ,debug =cfg.debug)
 
