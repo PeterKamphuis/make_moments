@@ -15,7 +15,8 @@ def get_config(moments_default=True,PV_default=False):
         output_name: Optional[str] = None
         output_directory: str = f'{os.getcwd()}'
         debug: bool = False
-        velocity_unit: Optional[str] = None
+        cube_velocity_unit: Optional[str] = None
+        map_velocity_unit: Optional[str] = None
         overwrite: bool=False
         if moments_default:
             level: Optional[float] = None

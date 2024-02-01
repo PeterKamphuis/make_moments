@@ -77,14 +77,14 @@ Exiting moments.''')
             sys.exit(1)
         moments(filename = cfg.filename, mask = cfg.mask, moments = cfg.moments,\
                      overwrite = cfg.overwrite, level= cfg.level,\
-                     velocity_unit= cfg.velocity_unit, threshold = cfg.threshold,\
-                     debug = cfg.debug, log=cfg.log,\
+                     cube_velocity_unit= cfg.cube_velocity_unit, threshold = cfg.threshold,\
+                     debug = cfg.debug, log=cfg.log,map_velocity_unit = cfg.map_velocity_unit,\
                      output_directory = cfg.output_directory,\
                      output_name = cfg.output_name)
    
     if create_PV:
         extract_pv(filename = cfg.filename,overwrite = cfg.overwrite,\
-                    velocity_unit= cfg.velocity_unit,PA=cfg.PA,\
+                    cube_velocity_unit= cfg.cube_velocity_unit,PA=cfg.PA,\
                     center= cfg.center,finalsize=cfg.finalsize,\
                     convert= cfg.convert,log = cfg.log,\
                     output_directory = cfg.output_directory,
