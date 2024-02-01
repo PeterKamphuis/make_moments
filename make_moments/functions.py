@@ -23,6 +23,7 @@ def print_log(log_statement,log=False):
 
 # Extract a PV-Diagrams
 def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit= None,log = False,\
+        map_velocity_unit = None,\
         PA=0.,center= None,finalsize=None,convert=-1,restfreq = None,silent=False,velocity_type= None,\
         output_directory = None,output_name =None,debug =False, spectral_frame= None, carta=False):
     log_statement = ''
@@ -176,31 +177,28 @@ cpix = {centralpix} value = {linex[centralpix]}
         TwoD_hdr['CRPIX2'] = hdr['CRPIX3']-int(nz/2.-finalsize[1]/2.)
         TwoD_hdr['CRPIX1'] = xcen-xstart+1
 
-    if convert !=-1:
-        TwoD_hdr['CRVAL2'] = hdr['CRVAL3']/convert
-        TwoD_hdr['CDELT2'] = hdr['CDELT3']/convert
-    else:
-        TwoD_hdr['CRVAL2'] = hdr['CRVAL3']
-        TwoD_hdr['CDELT2'] = hdr['CDELT3']
+
+    TwoD_hdr['CRVAL2'] = hdr['CRVAL3']
+    TwoD_hdr['CDELT2'] = hdr['CDELT3']
     TwoD_hdr['CTYPE2'] = hdr['CTYPE3']
-    try:
-        if hdr['CUNIT3'].lower() == 'm/s' and convert == 1000. :
-            TwoD_hdr['CDELT2'] = hdr['CDELT3']/1000.
-            TwoD_hdr['CRVAL2'] = hdr['CRVAL3']/1000.
-            TwoD_hdr['CUNIT2'] = 'km/s'
-            del (TwoD_hdr['CUNIT3'])
-        elif  convert != -1:
-            del (TwoD_hdr['CUNIT3'])
-            try:
-                del (TwoD_hdr['CUNIT2'])
-            except KeyError:
-                pass
-        else:
-            TwoD_hdr['CUNIT2'] = hdr['CUNIT3']
-            del (TwoD_hdr['CUNIT3'])
-    except KeyError:
-        print_log(f'''EXTRACT_PV: We could not find units in the header for the 3rd axis.
-''', log)
+    TwoD_hdr['CUNIT2'] = hdr['CUNIT3']
+    
+    if hdr['CUNIT3'].lower() == 'm/s' and map_velocity_unit.lower() == 'km/s':
+        TwoD_hdr['CDELT2'] = hdr['CDELT3']/1000.
+        TwoD_hdr['CRVAL2'] = hdr['CRVAL3']/1000.
+        TwoD_hdr['CUNIT2'] = 'km/s'
+    elif hdr['CUNIT3'].lower() == 'km/s' and map_velocity_unit.lower() == 'm/s':
+        TwoD_hdr['CDELT2'] = hdr['CDELT3']*1000.
+        TwoD_hdr['CRVAL2'] = hdr['CRVAL3']*1000.
+        TwoD_hdr['CUNIT2'] = 'm/s'
+
+
+    if convert != -1:
+        TwoD_hdr['CDELT2'] = hdr['CDELT3']*convert
+        TwoD_hdr['CRVAL2'] = hdr['CRVAL3']*convert
+        TwoD_hdr['CUNIT2'] = map_velocity_unit
+    
+    del (TwoD_hdr['CUNIT3'])
     del (TwoD_hdr['CRPIX3'])
     del (TwoD_hdr['CRVAL3'])
     del (TwoD_hdr['CDELT3'])
