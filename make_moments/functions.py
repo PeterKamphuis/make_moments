@@ -22,7 +22,7 @@ def print_log(log_statement,log=False):
         return ''
 
 # Extract a PV-Diagrams
-def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None,log = False,\
+def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit= None,log = False,\
         PA=0.,center= None,finalsize=None,convert=-1,restfreq = None,silent=False,velocity_type= None,\
         output_directory = None,output_name =None,debug =False, spectral_frame= None, carta=False):
     log_statement = ''
@@ -37,14 +37,26 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
         output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}_PV.fits'
     close = False
     if filename == None and cube == None:
-        InputError("EXTRACT_PV: You need to give us something to work with.")
+        raise InputError("EXTRACT_PV: You need to give us something to work with.")
     elif filename != None and cube != None:
-        InputError("EXTRACT_PV: Give us a cube or a file but not both.")
+        raise InputError("EXTRACT_PV: Give us a cube or a file but not both.")
     elif filename != None:
         cube = fits.open(filename)
         close = True
-    if velocity_unit:
-        cube[0].header['CUNIT3'] = velocity_unit
+    if cube_velocity_unit:
+        if 'CUNIT3' in cube[0].header:
+            if cube[0].header['CUNIT3'].lower().strip() in ['m/s','km/s'] and \
+                cube_velocity_unit.lower().strip() in ['m/s','km/s']:
+                pass
+            elif cube[0].header['CUNIT3'].lower().strip() != cube_velocity_unit.lower().strip():
+                raise InputError(f"The cube velocity units {cube[0].header['CUNIT3'].lower().strip()} do not match your input {cube_velocity_unit}.")
+        else:
+           cube[0].header['CUNIT3'] = cube_velocity_unit 
+    else:
+        if 'CUNIT3' in cube[0].header:
+            cube_velocity_unit = cube[0].header['CUNIT3']
+        else:
+            log_statement += print_log(f"We have no velocity units for your cube")      
     if not velocity_type is None:
         cube[0].header['CTYPE3'] = velocity_type
     log_statement += print_log(f'''EXTRACT_PV: We are starting the extraction of a PV-Diagram
@@ -58,15 +70,18 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
     TwoD_hdr= copy.deepcopy(cube[0].header)
     data = copy.deepcopy(cube[0].data)
     #Because astro py is even dumber than Python
-    try:
-        if hdr['CUNIT3'].lower() == 'km/s':
-            hdr['CUNIT3'] = 'm/s'
-            hdr['CDELT3'] = hdr['CDELT3']*1000.
-            hdr['CRVAL3'] = hdr['CRVAL3']*1000.
-        elif hdr['CUNIT3'].lower() == 'm/s':
-            hdr['CUNIT3'] = 'm/s'
-    except KeyError:
+  
+    if hdr['CUNIT3'].lower() == 'km/s' and cube_velocity_unit.lower().strip() == 'm/s':
         hdr['CUNIT3'] = 'm/s'
+        hdr['CDELT3'] = hdr['CDELT3']*1000.
+        hdr['CRVAL3'] = hdr['CRVAL3']*1000.
+    elif hdr['CUNIT3'].lower() == 'm/s' and cube_velocity_unit.lower().strip() == 'km/s': 
+        hdr['CUNIT3'] = 'km/s'
+        hdr['CDELT3'] = hdr['CDELT3']/1000.
+        hdr['CRVAL3'] = hdr['CRVAL3']/1000.
+       
+
+   
     if center[0] == -1:
         center = [hdr['CRVAL1'],hdr['CRVAL2'],hdr['CRVAL3']]
         xcenter,ycenter,zcenter = hdr['CRPIX1'],hdr['CRPIX2'],hdr['CRPIX3']
@@ -298,8 +313,8 @@ extract_pv.__doc__ = '''
 
 
 def moments(filename = None, cube = None, mask = None, moments = None,overwrite = False,\
-            level=None,velocity_unit= None, threshold = 3.,debug = False, \
-            log=False,output_directory = None,output_name =None):
+            level=None,cube_velocity_unit= None, map_velocity_unit= None,\
+            threshold = 3.,debug = False, log=False,output_directory = None,output_name =None):
     log_statement = ''
     log_statement += print_log(f'''MOMENTS: We are starting to create the moment maps.
 ''',log)
@@ -321,8 +336,16 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
     if not output_name:
         output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}'
     
-    if velocity_unit:
-        cube[0].header['CUNIT3'] = velocity_unit
+    if cube_velocity_unit is None:
+        if 'CUNIT3' not in cube[0].header:
+            raise InputError(f"MOMENTS: Your CUNIT3 is missing, that is bad practice. You can use moments by setting cube_velocity_unit")
+        else:
+            cube_velocity_unit = cube[0].header['CUNIT3']
+    else: 
+        if 'CUNIT3' not in cube[0].header:
+            cube[0].header['CUNIT3'] = cube_velocity_unit
+        elif cube[0].header['CUNIT3'] != cube_velocity_unit:
+            raise InputError(f"You're input  cube velocity unit and the unit of the cube do not match.")  
     if mask:
         mask_cube = fits.open(mask)
         if len(np.where(mask_cube[0].data > 0.5)[0]) < 1:
@@ -341,17 +364,22 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         with np.errstate(invalid='ignore', divide='ignore'):
             cube[0].data[cube[0].data < level] = float('NaN')
     try:
-        if cube[0].header['CUNIT3'].lower().strip() == 'm/s':
-            log_statement += print_log(f"MOMENTS: We convert your m/s to km/s. \n",log)
-            cube[0].header['CUNIT3'] = 'km/s'
-            cube[0].header['CDELT3'] = cube[0].header['CDELT3']/1000.
-            cube[0].header['CRVAL3'] = cube[0].header['CRVAL3']/1000.
-        elif cube[0].header['CUNIT3'].lower().strip() == 'km/s':
-            pass
-        else:
-            log_statement += print_log(f"MOMENTS: Your Velocity unit {cube[0].header['CUNIT3']} is weird. Your units could be off", log)
+        if map_velocity_unit is not None:
+            if cube[0].header['CUNIT3'].lower().strip() == 'm/s' and map_velocity_unit.lower().strip() == 'km/s':
+                log_statement += print_log(f"MOMENTS: We convert your m/s to km/s. \n",log)
+                cube[0].header['CUNIT3'] = 'km/s'
+                cube[0].header['CDELT3'] = cube[0].header['CDELT3']/1000.
+                cube[0].header['CRVAL3'] = cube[0].header['CRVAL3']/1000.
+            elif cube[0].header['CUNIT3'].lower().strip() == 'km/s' and map_velocity_unit.lower().strip() == 'm/s' :
+                log_statement += print_log(f"MOMENTS: We convert your km/s to m/s. \n",log)
+                cube[0].header['CUNIT3'] = 'm/s'
+                cube[0].header['CDELT3'] = cube[0].header['CDELT3']*1000.
+                cube[0].header['CRVAL3'] = cube[0].header['CRVAL3']*1000.
+            else:
+                if cube_velocity_unit.lower().strip() != map_velocity_unit.lower().strip():
+                    raise InputError(f'We do not know how to convert from {cube_velocity_unit} to {map_velocity_unit}')
     except KeyError:
-        log_statement += print_log(f"MOMENTS: Your CUNIT3 is missing, that is bad practice. We'll add a blank one but we're not guessing the value", log)
+        log_statement += print_log(f"MOMENTS: Your CUNIT3 is missing, that is bad practice. You can run make moments by setting cube_velocty_unit.", log)
         cube[0].header['CUNIT3'] = 'Unknown'
     #Make a 2D header to use
     hdr2D = copy.deepcopy(cube[0].header)
@@ -368,7 +396,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
     if 0 in moments:
         log_statement += print_log(f"MOMENTS: Creating a moment 0. \n", log)
         hdr2D['BUNIT'] = f"{cube[0].header['BUNIT']}*{cube[0].header['CUNIT3']}"
-        moment0 = np.nansum(cube[0].data, axis=0) * cube[0].header['CDELT3']
+        moment0 = np.nansum(cube[0].data, axis=0) * abs(cube[0].header['CDELT3'])
         moment0[np.invert(np.isfinite(moment0))] = float('NaN')
         try:
             hdr2D['DATAMAX'] = np.nanmax(moment0)
@@ -447,8 +475,11 @@ moments.__doc__ =f'''
     level=None
     cutoff level to use, if set the mask will not be used
 
-    velocity_unit= none
+    cube_velocity_unit= none
     velocity unit of the input cube
+
+    map_velocity_unit= none
+    velocity unit of the output maps
 
     threshold = 3.
     Cutoff level in terms of sigma, if used the std in in the first two and last channels in the cube is measured and multiplied.
