@@ -57,7 +57,7 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
         if 'CUNIT3' in cube[0].header:
             cube_velocity_unit = cube[0].header['CUNIT3']
         else:
-            log_statement += print_log(f"We have no velocity units for your cube")      
+            log_statement += print_log(f"We have no velocity units for your cube. \n",log)      
     if not velocity_type is None:
         cube[0].header['CTYPE3'] = velocity_type
     log_statement += print_log(f'''EXTRACT_PV: We are starting the extraction of a PV-Diagram
@@ -164,7 +164,7 @@ cpix = {centralpix} value = {linex[centralpix]}
         TwoD_hdr['NAXIS1'] = nx
 
         TwoD_hdr['CRPIX2'] = hdr['CRPIX3']
-        TwoD_hdr['CRPIX1'] = xcen+1
+        TwoD_hdr['CRPIX1'] = xcen
     else:
         zstart = set_limits(int(zcenter-finalsize[1]/2.),0,int(nz))
         zend = set_limits(int(zcenter+finalsize[1]/2.),0,int(nz))
@@ -175,7 +175,7 @@ cpix = {centralpix} value = {linex[centralpix]}
         TwoD_hdr['NAXIS2'] = int(finalsize[1])
         TwoD_hdr['NAXIS1'] = int(finalsize[0])
         TwoD_hdr['CRPIX2'] = hdr['CRPIX3']-int(nz/2.-finalsize[1]/2.)
-        TwoD_hdr['CRPIX1'] = xcen-xstart+1
+        TwoD_hdr['CRPIX1'] = xcen-xstart
 
 
     TwoD_hdr['CRVAL2'] = hdr['CRVAL3']
@@ -401,7 +401,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
             hdr2D['DATAMIN'] = np.nanmin(moment0)
             fits.writeto(f"{output_directory}/{output_name}_mom0.fits",moment0,hdr2D,overwrite = overwrite)
         except ValueError:
-            log_statement += print_log(f"MOMENTS: Your Moment 0 has bad data and we could not write the moment 0 fits file", log)
+            log_statement += print_log(f"MOMENTS: Your Moment 0 has bad data and we could not write the moment 0 fits file. \n", log)
             raise  InputError(f'Something went wrong in the moments module')
 
    
@@ -422,7 +422,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
             if 1 in moments:
                 fits.writeto(f"{output_directory}/{output_name}_mom1.fits",moment1,hdr2D,overwrite = overwrite)
         except ValueError:
-            log_statement += print_log(f"MOMENTS: Your Moment 1 has bad data and we could not write the moment 1 fits file", log)
+            log_statement += print_log(f"MOMENTS: Your Moment 1 has bad data and we could not write the moment 1 fits file. \n", log)
             raise  InputError(f'Something went wrong in the moments module')
 
         if 2 in moments:
@@ -436,7 +436,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
                 hdr2D['DATAMIN'] = np.nanmin(moment2)
                 fits.writeto(f"{output_directory}/{output_name}_mom2.fits",moment2,hdr2D,overwrite = overwrite)
             except ValueError:
-                log_statement += print_log(f"MOMENTS: Your Moment 2 has bad data and we could not write the moment 2 fits file", log)
+                log_statement += print_log(f"MOMENTS: Your Moment 2 has bad data and we could not write the moment 2 fits file. \n", log)
                 raise  InputError(f'Something went wrong in the moments module')
 
     log_statement += print_log(f"MOMENTS: Finished moments.\n", log)
