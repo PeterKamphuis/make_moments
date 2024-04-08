@@ -125,7 +125,7 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
     #for i in range(len(linex)):
     #    print(f'{linex[i]} {i} {xcenter}  {liney[i]} {ycenter} {offset[i]}')
     offset_abs = [abs(x) for x in offset]
-    centralpix = offset_abs.index(np.min(offset_abs))
+    centralpix = offset_abs.index(np.nanmin(offset_abs))
     print_log(f'''EXTRACT_PV: In our map coordinates we find the central pixels to be
 cpix = {centralpix} value = {linex[centralpix]}
 ''', log)
