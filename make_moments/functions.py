@@ -306,15 +306,18 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         cube = fits.open(filename)
         close = True
 
-    if not output_directory:
+    if output_directory is None:
         output_directory= f'{os.getcwd()}'
-    if not output_name:
-        output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}'
+    #if not output_name:
+    #    output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}'
     
     if velocity_unit:
         cube[0].header['CUNIT3'] = velocity_unit
     if mask:
-        mask_cube = fits.open(mask)
+        if np.isinstance(mask,str): 
+            mask_cube = fits.open(mask)
+        else:
+            mask_cube = mask 
         if len(np.where(mask_cube[0].data > 0.5)[0]) < 1:
            raise InputError(f'We expect mask values to start at 1 your mask has no values above 0.5')
 
