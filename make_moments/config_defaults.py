@@ -15,7 +15,8 @@ def get_config(moments_default=True,PV_default=False):
         output_name: Optional[str] = None
         output_directory: str = f'{os.getcwd()}'
         debug: bool = False
-        velocity_unit: Optional[str] = None
+        cube_velocity_unit: Optional[str] = None
+        map_velocity_unit: Optional[str] = None
         overwrite: bool=False
         if moments_default:
             level: Optional[float] = None
@@ -29,6 +30,7 @@ def get_config(moments_default=True,PV_default=False):
             carta: bool = False #Carta will only accept stupid fequency axis
             restfreq: float = 1.420405751767E+09 #hz
             spectral_frame: str = 'BARYCENT'
+            velocity_type: Optional[str] = None
 
     cfg = OmegaConf.structured(defaults)
     return cfg
