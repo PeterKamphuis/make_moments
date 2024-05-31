@@ -58,7 +58,9 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
         if 'CUNIT3' in cube[0].header:
             cube_velocity_unit = cube[0].header['CUNIT3']
         else:
-            log_statement += print_log(f"We have no velocity units for your cube")      
+            log_statement += print_log(f"We have no velocity units for your cube")  
+    if map_velocity_unit is None:
+        map_velocity_unit = cube[0].header['CUNIT3']     
     if not velocity_type is None:
         cube[0].header['CTYPE3'] = velocity_type
     log_statement += print_log(f'''EXTRACT_PV: We are starting the extraction of a PV-Diagram
