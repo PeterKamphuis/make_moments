@@ -22,8 +22,9 @@ def print_log(log_statement,log=False):
         return ''
 
 # Extract a PV-Diagrams
-def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None,log = False,\
-        PA=0.,center= None,finalsize=None,convert=-1,restfreq = None,silent=False,\
+def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit= None,log = False,\
+        map_velocity_unit = None,\
+        PA=0.,center= None,finalsize=None,convert=-1,restfreq = None,silent=False,velocity_type= None,\
         output_directory = None,output_name =None,debug =False, spectral_frame= None, carta=False):
     log_statement = ''
     if center is None:
@@ -37,15 +38,29 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
         output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}_PV.fits'
     close = False
     if filename == None and cube == None:
-        InputError("EXTRACT_PV: You need to give us something to work with.")
+        raise InputError("EXTRACT_PV: You need to give us something to work with.")
     elif filename != None and cube != None:
-        InputError("EXTRACT_PV: Give us a cube or a file but not both.")
+        raise InputError("EXTRACT_PV: Give us a cube or a file but not both.")
     elif filename != None:
         cube = fits.open(filename)
         close = True
-    if velocity_unit:
-        cube[0].header['CUNIT3'] = velocity_unit
-    log_statement += print_log(f'''EXTRACT_PV: We are the extraction of a PV-Diagram
+    if cube_velocity_unit:
+        if 'CUNIT3' in cube[0].header:
+            if cube[0].header['CUNIT3'].lower().strip() in ['m/s','km/s'] and \
+                cube_velocity_unit.lower().strip() in ['m/s','km/s']:
+                pass
+            elif cube[0].header['CUNIT3'].lower().strip() != cube_velocity_unit.lower().strip():
+                raise InputError(f"The cube velocity units {cube[0].header['CUNIT3'].lower().strip()} do not match your input {cube_velocity_unit}.")
+        else:
+           cube[0].header['CUNIT3'] = cube_velocity_unit 
+    else:
+        if 'CUNIT3' in cube[0].header:
+            cube_velocity_unit = cube[0].header['CUNIT3']
+        else:
+            log_statement += print_log(f"We have no velocity units for your cube")      
+    if not velocity_type is None:
+        cube[0].header['CTYPE3'] = velocity_type
+    log_statement += print_log(f'''EXTRACT_PV: We are starting the extraction of a PV-Diagram
 {'':8s} PA = {PA}
 {'':8s} center = {center}
 {'':8s} finalsize = {finalsize}
@@ -56,15 +71,18 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
     TwoD_hdr= copy.deepcopy(cube[0].header)
     data = copy.deepcopy(cube[0].data)
     #Because astro py is even dumber than Python
-    try:
-        if hdr['CUNIT3'].lower() == 'km/s':
-            hdr['CUNIT3'] = 'm/s'
-            hdr['CDELT3'] = hdr['CDELT3']*1000.
-            hdr['CRVAL3'] = hdr['CRVAL3']*1000.
-        elif hdr['CUNIT3'].lower() == 'm/s':
-            hdr['CUNIT3'] = 'm/s'
-    except KeyError:
+  
+    if hdr['CUNIT3'].lower() == 'km/s' and cube_velocity_unit.lower().strip() == 'm/s':
         hdr['CUNIT3'] = 'm/s'
+        hdr['CDELT3'] = hdr['CDELT3']*1000.
+        hdr['CRVAL3'] = hdr['CRVAL3']*1000.
+    elif hdr['CUNIT3'].lower() == 'm/s' and cube_velocity_unit.lower().strip() == 'km/s': 
+        hdr['CUNIT3'] = 'km/s'
+        hdr['CDELT3'] = hdr['CDELT3']/1000.
+        hdr['CRVAL3'] = hdr['CRVAL3']/1000.
+       
+
+   
     if center[0] == -1:
         center = [hdr['CRVAL1'],hdr['CRVAL2'],hdr['CRVAL3']]
         xcenter,ycenter,zcenter = hdr['CRPIX1'],hdr['CRPIX2'],hdr['CRPIX3']
@@ -74,7 +92,9 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
             coordinate_frame = WCS(hdr)
         
         xcenter,ycenter,zcenter = coordinate_frame.wcs_world2pix(center[0], center[1], center[2], 1.)
-   
+    print_log(f'''EXTRACT_PV: We get these pixels for the center,
+xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}              
+''', log)
     nz, ny, nx = data.shape
     if finalsize[0] != -1:
         if finalsize[1] >nz:
@@ -89,8 +109,10 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
 {'':8s} nx = {nx}
 ''', log)
     x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[hdr['NAXIS1'],hdr['NAXIS2']])
+
    
     linex,liney,linez = np.linspace(x1,x2,nx), np.linspace(y1,y2,nx), np.linspace(0,nz-1,nz)
+
     #We need to find our center in these coordinates
     if x1 > x2 and y1 > y2:
         offset = [(xcenter-x+ycenter-y) for x,y in zip (linex,liney)]
@@ -100,10 +122,13 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
         offset = [(xcenter-x+y-ycenter) for x,y in zip (linex,liney)]
     else:
         offset = [(x-xcenter+y-ycenter) for x,y in zip (linex,liney)]
-    
+    #for i in range(len(linex)):
+    #    print(f'{linex[i]} {i} {xcenter}  {liney[i]} {ycenter} {offset[i]}')
     offset_abs = [abs(x) for x in offset]
     centralpix = offset_abs.index(np.min(offset_abs))
-   
+    print_log(f'''EXTRACT_PV: In our map coordinates we find the central pixels to be
+cpix = {centralpix} value = {linex[centralpix]}
+''', log)
     if offset[centralpix] > 0:
         xc1 =  centralpix-1
         yc1 = offset[centralpix-1]
@@ -116,9 +141,10 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
         yc2 = offset[centralpix+1]
   
     xcen = xc1+(xc2-xc1)*(-yc1/(yc2-yc1))
-    if PA > 180.:
+    #if PA < 180.:
+    if y1 > y2:
         xcen= nx-xcen
-   
+  
 
 
     #This only works when ny == nx hence nx is used in liney
@@ -142,8 +168,8 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
     else:
         zstart = set_limits(int(zcenter-finalsize[1]/2.),0,int(nz))
         zend = set_limits(int(zcenter+finalsize[1]/2.),0,int(nz))
-        xstart = set_limits(int(xcenter-finalsize[0]/2.),0,int(nx))
-        xend = set_limits(int(xcenter+finalsize[0]/2.),0,int(nx))
+        xstart = set_limits(int(xcen-finalsize[0]/2.),0,int(nx))
+        xend = set_limits(int(xcen+finalsize[0]/2.),0,int(nx))
 
         PV =  PV[zstart:zend, xstart:xend]
         TwoD_hdr['NAXIS2'] = int(finalsize[1])
@@ -151,31 +177,28 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
         TwoD_hdr['CRPIX2'] = hdr['CRPIX3']-int(nz/2.-finalsize[1]/2.)
         TwoD_hdr['CRPIX1'] = xcen-xstart+1
 
-    if convert !=-1:
-        TwoD_hdr['CRVAL2'] = hdr['CRVAL3']/convert
-        TwoD_hdr['CDELT2'] = hdr['CDELT3']/convert
-    else:
-        TwoD_hdr['CRVAL2'] = hdr['CRVAL3']
-        TwoD_hdr['CDELT2'] = hdr['CDELT3']
+
+    TwoD_hdr['CRVAL2'] = hdr['CRVAL3']
+    TwoD_hdr['CDELT2'] = hdr['CDELT3']
     TwoD_hdr['CTYPE2'] = hdr['CTYPE3']
-    try:
-        if hdr['CUNIT3'].lower() == 'm/s' and convert == 1000. :
-            TwoD_hdr['CDELT2'] = hdr['CDELT3']/1000.
-            TwoD_hdr['CRVAL2'] = hdr['CRVAL3']/1000.
-            TwoD_hdr['CUNIT2'] = 'km/s'
-            del (TwoD_hdr['CUNIT3'])
-        elif  convert != -1:
-            del (TwoD_hdr['CUNIT3'])
-            try:
-                del (TwoD_hdr['CUNIT2'])
-            except KeyError:
-                pass
-        else:
-            TwoD_hdr['CUNIT2'] = hdr['CUNIT3']
-            del (TwoD_hdr['CUNIT3'])
-    except KeyError:
-        print_log(f'''EXTRACT_PV: We could not find units in the header for the 3rd axis.
-''', log)
+    TwoD_hdr['CUNIT2'] = hdr['CUNIT3']
+    
+    if hdr['CUNIT3'].lower() == 'm/s' and map_velocity_unit.lower() == 'km/s':
+        TwoD_hdr['CDELT2'] = hdr['CDELT3']/1000.
+        TwoD_hdr['CRVAL2'] = hdr['CRVAL3']/1000.
+        TwoD_hdr['CUNIT2'] = 'km/s'
+    elif hdr['CUNIT3'].lower() == 'km/s' and map_velocity_unit.lower() == 'm/s':
+        TwoD_hdr['CDELT2'] = hdr['CDELT3']*1000.
+        TwoD_hdr['CRVAL2'] = hdr['CRVAL3']*1000.
+        TwoD_hdr['CUNIT2'] = 'm/s'
+
+
+    if convert != -1:
+        TwoD_hdr['CDELT2'] = hdr['CDELT3']*convert
+        TwoD_hdr['CRVAL2'] = hdr['CRVAL3']*convert
+        TwoD_hdr['CUNIT2'] = map_velocity_unit
+    
+    del (TwoD_hdr['CUNIT3'])
     del (TwoD_hdr['CRPIX3'])
     del (TwoD_hdr['CRVAL3'])
     del (TwoD_hdr['CDELT3'])
@@ -288,8 +311,8 @@ extract_pv.__doc__ = '''
 
 
 def moments(filename = None, cube = None, mask = None, moments = None,overwrite = False,\
-            level=None,velocity_unit= None, threshold = 3.,debug = False, \
-            log=False,output_directory = None,output_name =None):
+            level=None,cube_velocity_unit= None, map_velocity_unit= None,\
+            threshold = 3.,debug = False, log=False,output_directory = None,output_name =None):
     log_statement = ''
     log_statement += print_log(f'''MOMENTS: We are starting to create the moment maps.
 ''',log)
@@ -311,8 +334,16 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
     #if not output_name:
     #    output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}'
     
-    if velocity_unit:
-        cube[0].header['CUNIT3'] = velocity_unit
+    if cube_velocity_unit is None:
+        if 'CUNIT3' not in cube[0].header:
+            raise InputError(f"MOMENTS: Your CUNIT3 is missing, that is bad practice. You can use moments by setting cube_velocity_unit")
+        else:
+            cube_velocity_unit = cube[0].header['CUNIT3']
+    else: 
+        if 'CUNIT3' not in cube[0].header:
+            cube[0].header['CUNIT3'] = cube_velocity_unit
+        elif cube[0].header['CUNIT3'] != cube_velocity_unit:
+            raise InputError(f"You're input  cube velocity unit and the unit of the cube do not match.")  
     if mask:
         if np.isinstance(mask,str): 
             mask_cube = fits.open(mask)
@@ -334,17 +365,22 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         with np.errstate(invalid='ignore', divide='ignore'):
             cube[0].data[cube[0].data < level] = float('NaN')
     try:
-        if cube[0].header['CUNIT3'].lower().strip() == 'm/s':
-            log_statement += print_log(f"MOMENTS: We convert your m/s to km/s. \n",log)
-            cube[0].header['CUNIT3'] = 'km/s'
-            cube[0].header['CDELT3'] = cube[0].header['CDELT3']/1000.
-            cube[0].header['CRVAL3'] = cube[0].header['CRVAL3']/1000.
-        elif cube[0].header['CUNIT3'].lower().strip() == 'km/s':
-            pass
-        else:
-            log_statement += print_log(f"MOMENTS: Your Velocity unit {cube[0].header['CUNIT3']} is weird. Your units could be off", log)
+        if map_velocity_unit is not None:
+            if cube[0].header['CUNIT3'].lower().strip() == 'm/s' and map_velocity_unit.lower().strip() == 'km/s':
+                log_statement += print_log(f"MOMENTS: We convert your m/s to km/s. \n",log)
+                cube[0].header['CUNIT3'] = 'km/s'
+                cube[0].header['CDELT3'] = cube[0].header['CDELT3']/1000.
+                cube[0].header['CRVAL3'] = cube[0].header['CRVAL3']/1000.
+            elif cube[0].header['CUNIT3'].lower().strip() == 'km/s' and map_velocity_unit.lower().strip() == 'm/s' :
+                log_statement += print_log(f"MOMENTS: We convert your km/s to m/s. \n",log)
+                cube[0].header['CUNIT3'] = 'm/s'
+                cube[0].header['CDELT3'] = cube[0].header['CDELT3']*1000.
+                cube[0].header['CRVAL3'] = cube[0].header['CRVAL3']*1000.
+            else:
+                if cube_velocity_unit.lower().strip() != map_velocity_unit.lower().strip():
+                    raise InputError(f'We do not know how to convert from {cube_velocity_unit} to {map_velocity_unit}')
     except KeyError:
-        log_statement += print_log(f"MOMENTS: Your CUNIT3 is missing, that is bad practice. We'll add a blank one but we're not guessing the value", log)
+        log_statement += print_log(f"MOMENTS: Your CUNIT3 is missing, that is bad practice. You can run make moments by setting cube_velocty_unit.", log)
         cube[0].header['CUNIT3'] = 'Unknown'
     #Make a 2D header to use
     hdr2D = copy.deepcopy(cube[0].header)
@@ -361,7 +397,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
     if 0 in moments:
         log_statement += print_log(f"MOMENTS: Creating a moment 0. \n", log)
         hdr2D['BUNIT'] = f"{cube[0].header['BUNIT']}*{cube[0].header['CUNIT3']}"
-        moment0 = np.nansum(cube[0].data, axis=0) * cube[0].header['CDELT3']
+        moment0 = np.nansum(cube[0].data, axis=0) * abs(cube[0].header['CDELT3'])
         moment0[np.invert(np.isfinite(moment0))] = float('NaN')
         try:
             hdr2D['DATAMAX'] = np.nanmax(moment0)
@@ -440,8 +476,11 @@ moments.__doc__ =f'''
     level=None
     cutoff level to use, if set the mask will not be used
 
-    velocity_unit= none
+    cube_velocity_unit= none
     velocity unit of the input cube
+
+    map_velocity_unit= none
+    velocity unit of the output maps
 
     threshold = 3.
     Cutoff level in terms of sigma, if used the std in in the first two and last channels in the cube is measured and multiplied.
