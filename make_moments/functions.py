@@ -33,16 +33,18 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
    
     if not output_directory:
         output_directory= f'{os.getcwd()}'
-    if not output_name:
-        output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}_PV.fits'
+    #if not output_name:
+    #    output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}_PV.fits'
     close = False
     if filename == None and cube == None:
         InputError("EXTRACT_PV: You need to give us something to work with.")
     elif filename != None and cube != None:
         InputError("EXTRACT_PV: Give us a cube or a file but not both.")
-    elif filename != None:
+    
+    if filename != None:
         cube = fits.open(filename)
         close = True
+    
     if velocity_unit:
         cube[0].header['CUNIT3'] = velocity_unit
     log_statement += print_log(f'''EXTRACT_PV: We are the extraction of a PV-Diagram
@@ -241,8 +243,13 @@ def extract_pv(filename = None,cube= None, overwrite = False,velocity_unit= None
        
 
 
-  
-    fits.writeto(f"{output_directory}/{output_name}",PV,TwoD_hdr,overwrite = overwrite)
+    if not output_name is None:
+        fits.writeto(f"{output_directory}/{output_name}",PV,TwoD_hdr,overwrite = overwrite)
+    else:
+        PV_diagram = copy.deepcopy(cube)
+        PV_diagram[0].data = PV
+        PV_diagram[0].header = TwoD_hdr
+        return PV_diagram
     if close:
         cube.close()
     if log:
@@ -314,7 +321,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
     if velocity_unit:
         cube[0].header['CUNIT3'] = velocity_unit
     if mask:
-        if np.isinstance(mask,str): 
+        if isinstance(mask,str): 
             mask_cube = fits.open(mask)
         else:
             mask_cube = mask 
@@ -356,7 +363,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
     hdr2D.remove('CUNIT3')
     hdr2D.remove('CRPIX3')
     hdr2D.remove('CRVAL3')
-
+    moment_maps = []
     # we need a moment 1  for the moment 2 as well
     if 0 in moments:
         log_statement += print_log(f"MOMENTS: Creating a moment 0. \n", log)
@@ -366,7 +373,13 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         try:
             hdr2D['DATAMAX'] = np.nanmax(moment0)
             hdr2D['DATAMIN'] = np.nanmin(moment0)
-            fits.writeto(f"{output_directory}/{output_name}_mom0.fits",moment0,hdr2D,overwrite = overwrite)
+            if not output_name is None:
+                fits.writeto(f"{output_directory}/{output_name}_mom0.fits",moment0,hdr2D,overwrite = overwrite)
+            else:
+                mom0 = copy.deepcopy(cube)
+                mom0[0].header=hdr2D
+                mom0[0].data=moment0
+                moment_maps.append(mom0)
         except ValueError:
             log_statement += print_log(f"MOMENTS: Your Moment 0 has bad data and we could not write the moment 0 fits file", log)
             raise  InputError(f'Something went wrong in the moments module')
@@ -387,7 +400,14 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
             hdr2D['DATAMAX'] = np.nanmax(moment1)
             hdr2D['DATAMIN'] = np.nanmin(moment1)
             if 1 in moments:
-                fits.writeto(f"{output_directory}/{output_name}_mom1.fits",moment1,hdr2D,overwrite = overwrite)
+                if not output_name is None:
+                    fits.writeto(f"{output_directory}/{output_name}_mom1.fits",moment1,hdr2D,overwrite = overwrite)
+                else:
+                    mom1 = copy.deepcopy(cube)
+                    mom1[0].header=hdr2D
+                    mom1[0].data=moment1
+                    moment_maps.append(mom1)
+  
         except ValueError:
             log_statement += print_log(f"MOMENTS: Your Moment 1 has bad data and we could not write the moment 1 fits file", log)
             raise  InputError(f'Something went wrong in the moments module')
@@ -401,7 +421,13 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
             try: 
                 hdr2D['DATAMAX'] = np.nanmax(moment2)
                 hdr2D['DATAMIN'] = np.nanmin(moment2)
-                fits.writeto(f"{output_directory}/{output_name}_mom2.fits",moment2,hdr2D,overwrite = overwrite)
+                if not output_name is None:
+                    fits.writeto(f"{output_directory}/{output_name}_mom2.fits",moment2,hdr2D,overwrite = overwrite)
+                else:
+                    mom2 = copy.deepcopy(cube)
+                    mom2[0].header=hdr2D
+                    mom2[0].data=moment2
+                    moment_maps.append(mom2)
             except ValueError:
                 log_statement += print_log(f"MOMENTS: Your Moment 2 has bad data and we could not write the moment 2 fits file", log)
                 raise  InputError(f'Something went wrong in the moments module')
@@ -409,7 +435,12 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
     log_statement += print_log(f"MOMENTS: Finished moments.\n", log)
     if close:
         cube.close()
+  
+    if output_name is None:
+        return moment_maps
     if log:
+
+        print(log_statement)
         return log_statement
 
 moments.__doc__ =f'''
