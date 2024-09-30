@@ -92,7 +92,7 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
             coordinate_frame = WCS(hdr)
         
         xcenter,ycenter,zcenter = coordinate_frame.wcs_world2pix(center[0], center[1], center[2], 1.)
-    print_log(f'''EXTRACT_PV: We get these pixels for the center,
+    log_statement +=  print_log(f'''EXTRACT_PV: We get these pixels for the center,
 xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}              
 ''', log)
     nz, ny, nx = data.shape
@@ -108,9 +108,9 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
 {'':8s} ny = {ny}
 {'':8s} nx = {nx}
 ''', log)
-    x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[hdr['NAXIS1'],hdr['NAXIS2']])
-
    
+    x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[hdr['NAXIS1'],hdr['NAXIS2']])
+    
     linex,liney,linez = np.linspace(x1,x2,nx), np.linspace(y1,y2,nx), np.linspace(0,nz-1,nz)
 
     #We need to find our center in these coordinates
@@ -125,10 +125,13 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
     #for i in range(len(linex)):
     #    print(f'{linex[i]} {i} {xcenter}  {liney[i]} {ycenter} {offset[i]}')
     offset_abs = [abs(x) for x in offset]
-    centralpix = offset_abs.index(np.nanmin(offset_abs))
-    print_log(f'''EXTRACT_PV: In our map coordinates we find the central pixels to be
-cpix = {centralpix} value = {linex[centralpix]}
+    if not np.isnan(np.nanmin(offset_abs)):
+        centralpix = offset_abs.index(np.nanmin(offset_abs))
+    else:
+        log_statement += print_log(f'''EXTRACT_PV: all our offset values are NaN
 ''', log)
+        raise InputError(f'EXTRACT_PV: all our offset values are NaN')
+
     if offset[centralpix] > 0:
         xc1 =  centralpix-1
         yc1 = offset[centralpix-1]

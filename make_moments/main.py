@@ -87,6 +87,7 @@ Exiting moments.''')
                     cube_velocity_unit= cfg.cube_velocity_unit,PA=cfg.PA,\
                     center= cfg.center,finalsize=cfg.finalsize,\
                     convert= cfg.convert,log = cfg.log,\
+                    map_velocity_unit = cfg.map_velocity_unit,\
                     output_directory = cfg.output_directory,
                     restfreq=cfg.restfreq,carta=cfg.carta,
                     velocity_type = cfg.velocity_type,
