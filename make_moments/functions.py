@@ -24,18 +24,16 @@ def print_log(log_statement,log=False):
 # Extract a PV-Diagrams
 def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit= None,log = False,\
         map_velocity_unit = None,\
-        PA=0.,center= None,finalsize=None,convert=-1,restfreq = None,silent=False,velocity_type= None,\
+        PA=0.,center= [None, None, None],finalsize=None,convert=-1,restfreq = None,silent=False,velocity_type= None,\
         output_directory = None,output_name =None,debug =False, spectral_frame= None, carta=False):
     log_statement = ''
-    if center is None:
-        center=[-1,-1,-1]
+   
     if finalsize is None:
         finalsize=[-1,-1]
    
     if not output_directory:
         output_directory= f'{os.getcwd()}'
-    #if not output_name:
-    #    output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}_PV.fits'
+   
     close = False
     if filename == None and cube == None:
         raise InputError("EXTRACT_PV: You need to give us something to work with.")
@@ -63,6 +61,8 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
         map_velocity_unit = cube[0].header['CUNIT3']     
     if not velocity_type is None:
         cube[0].header['CTYPE3'] = velocity_type
+    
+
     log_statement += print_log(f'''EXTRACT_PV: We are starting the extraction of a PV-Diagram
 {'':8s} PA = {PA}
 {'':8s} center = {center}
@@ -86,14 +86,13 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
        
 
    
-    if center[0] == -1:
+    if all(x is None for x in center):
         center = [hdr['CRVAL1'],hdr['CRVAL2'],hdr['CRVAL3']]
         xcenter,ycenter,zcenter = hdr['CRPIX1'],hdr['CRPIX2'],hdr['CRPIX3']
     else:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            coordinate_frame = WCS(hdr)
-        
+            coordinate_frame = WCS(hdr)        
         xcenter,ycenter,zcenter = coordinate_frame.wcs_world2pix(center[0], center[1], center[2], 1.)
     log_statement +=  print_log(f'''EXTRACT_PV: We get these pixels for the center,
 xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}              
@@ -106,7 +105,7 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
             finalsize[0] = nx
     # if the center is not set assume the crval values
 
-    print_log(f'''EXTRACT_PV: The shape of the output
+    log_statement += print_log(f'''EXTRACT_PV: The shape of the output
 {'':8s} nz = {nz}
 {'':8s} ny = {ny}
 {'':8s} nx = {nx}
@@ -263,22 +262,25 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
                 (1 - float(TwoD_hdr['CRVAL2']) / c)
        
         else:
-            print(f'AS only the radio definition leads to equal increments in frequency we dont know how to make your PV-Diagram compliant')
+            log_statement += print(f'As only the radio definition leads to equal increments in frequency we dont know how to make your PV-Diagram compliant. \n')
         TwoD_hdr['CUNIT2'] = 'hz'
         #TwoD_hdr['SPECSYS'] = 'FREQ'
         TwoD_hdr['CTYPE2'] = 'FREQ'
        
-
+    if close:
+        cube.close()
 
     if not output_name is None:
-        fits.writeto(f"{output_directory}/{output_name}",PV,TwoD_hdr,overwrite = overwrite)
+        fits.writeto(f"{output_directory}/{output_name}_PV.fits",PV,TwoD_hdr,overwrite = overwrite)
     else:
         PV_diagram = copy.deepcopy(cube)
         PV_diagram[0].data = PV
         PV_diagram[0].header = TwoD_hdr
-        return PV_diagram
-    if close:
-        cube.close()
+        if log:
+            return PV_diagram,log_statement
+        else:
+            return PV_diagram
+   
     if log:
         return log_statement
 
@@ -342,9 +344,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
 
     if output_directory is None:
         output_directory= f'{os.getcwd()}'
-    #if not output_name:
-    #    output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}'
-    
+   
     if cube_velocity_unit is None:
         if 'CUNIT3' not in cube[0].header:
             raise InputError(f"MOMENTS: Your CUNIT3 is missing, that is bad practice. You can use moments by setting cube_velocity_unit")
@@ -371,10 +371,10 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
             cube[0].data[mask_cube[0].data < 0.5] = float('NaN')
         mask_cube.close()
     else:
-        if not level:
+        if level is None:
             level = threshold*np.mean([np.nanstd(cube[0].data[0:2,:,:]),np.nanstd(cube[0].data[-3:-1,:,:])])
         with np.errstate(invalid='ignore', divide='ignore'):
-            cube[0].data[cube[0].data < level] = float('NaN')
+            cube[0].data[cube[0].data <= level] = float('NaN')
     try:
         if map_velocity_unit is not None:
             if cube[0].header['CUNIT3'].lower().strip() == 'm/s' and map_velocity_unit.lower().strip() == 'km/s':
@@ -477,10 +477,11 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         cube.close()
   
     if output_name is None:
-        return moment_maps
+        if log:
+            return moment_maps,log_statement
+        else:
+            return moment_maps
     if log:
-
-        print(log_statement)
         return log_statement
 
 moments.__doc__ =f'''
