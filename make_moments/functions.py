@@ -24,24 +24,23 @@ def print_log(log_statement,log=False):
 # Extract a PV-Diagrams
 def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit= None,log = False,\
         map_velocity_unit = None,\
-        PA=0.,center= None,finalsize=None,convert=-1,restfreq = None,silent=False,velocity_type= None,\
+        PA=0.,center= [None, None, None],finalsize=None,convert=-1,restfreq = None,silent=False,velocity_type= None,\
         output_directory = None,output_name =None,debug =False, spectral_frame= None, carta=False):
     log_statement = ''
-    if center is None:
-        center=[-1,-1,-1]
+   
     if finalsize is None:
         finalsize=[-1,-1]
    
     if not output_directory:
         output_directory= f'{os.getcwd()}'
-    if not output_name:
-        output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}_PV.fits'
+   
     close = False
     if filename == None and cube == None:
         raise InputError("EXTRACT_PV: You need to give us something to work with.")
-    elif filename != None and cube != None:
+    elif not filename is None and not cube is None:
         raise InputError("EXTRACT_PV: Give us a cube or a file but not both.")
-    elif filename != None:
+    
+    if not filename is None:
         cube = fits.open(filename)
         close = True
     if cube_velocity_unit:
@@ -57,9 +56,13 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
         if 'CUNIT3' in cube[0].header:
             cube_velocity_unit = cube[0].header['CUNIT3']
         else:
-            log_statement += print_log(f"We have no velocity units for your cube")      
+            log_statement += print_log(f"We have no velocity units for your cube. \n",log)  
+    if map_velocity_unit is None:
+        map_velocity_unit = cube[0].header['CUNIT3']     
     if not velocity_type is None:
         cube[0].header['CTYPE3'] = velocity_type
+    
+
     log_statement += print_log(f'''EXTRACT_PV: We are starting the extraction of a PV-Diagram
 {'':8s} PA = {PA}
 {'':8s} center = {center}
@@ -83,16 +86,15 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
        
 
    
-    if center[0] == -1:
+    if all(x is None for x in center):
         center = [hdr['CRVAL1'],hdr['CRVAL2'],hdr['CRVAL3']]
         xcenter,ycenter,zcenter = hdr['CRPIX1'],hdr['CRPIX2'],hdr['CRPIX3']
     else:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            coordinate_frame = WCS(hdr)
-        
+            coordinate_frame = WCS(hdr)        
         xcenter,ycenter,zcenter = coordinate_frame.wcs_world2pix(center[0], center[1], center[2], 1.)
-    print_log(f'''EXTRACT_PV: We get these pixels for the center,
+    log_statement +=  print_log(f'''EXTRACT_PV: We get these pixels for the center,
 xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}              
 ''', log)
     nz, ny, nx = data.shape
@@ -103,14 +105,14 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
             finalsize[0] = nx
     # if the center is not set assume the crval values
 
-    print_log(f'''EXTRACT_PV: The shape of the output
+    log_statement += print_log(f'''EXTRACT_PV: The shape of the output
 {'':8s} nz = {nz}
 {'':8s} ny = {ny}
 {'':8s} nx = {nx}
 ''', log)
-    x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[hdr['NAXIS1'],hdr['NAXIS2']])
-
    
+    x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[hdr['NAXIS1'],hdr['NAXIS2']])
+    
     linex,liney,linez = np.linspace(x1,x2,nx), np.linspace(y1,y2,nx), np.linspace(0,nz-1,nz)
 
     #We need to find our center in these coordinates
@@ -125,10 +127,13 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
     #for i in range(len(linex)):
     #    print(f'{linex[i]} {i} {xcenter}  {liney[i]} {ycenter} {offset[i]}')
     offset_abs = [abs(x) for x in offset]
-    centralpix = offset_abs.index(np.min(offset_abs))
-    print_log(f'''EXTRACT_PV: In our map coordinates we find the central pixels to be
-cpix = {centralpix} value = {linex[centralpix]}
+    if not np.isnan(np.nanmin(offset_abs)):
+        centralpix = offset_abs.index(np.nanmin(offset_abs))
+    else:
+        log_statement += print_log(f'''EXTRACT_PV: all our offset values are NaN
 ''', log)
+        raise InputError(f'EXTRACT_PV: all our offset values are NaN')
+
     if offset[centralpix] > 0:
         xc1 =  centralpix-1
         yc1 = offset[centralpix-1]
@@ -164,7 +169,7 @@ cpix = {centralpix} value = {linex[centralpix]}
         TwoD_hdr['NAXIS1'] = nx
 
         TwoD_hdr['CRPIX2'] = hdr['CRPIX3']
-        TwoD_hdr['CRPIX1'] = xcen+1
+        TwoD_hdr['CRPIX1'] = xcen
     else:
         zstart = set_limits(int(zcenter-finalsize[1]/2.),0,int(nz))
         zend = set_limits(int(zcenter+finalsize[1]/2.),0,int(nz))
@@ -175,7 +180,7 @@ cpix = {centralpix} value = {linex[centralpix]}
         TwoD_hdr['NAXIS2'] = int(finalsize[1])
         TwoD_hdr['NAXIS1'] = int(finalsize[0])
         TwoD_hdr['CRPIX2'] = hdr['CRPIX3']-int(nz/2.-finalsize[1]/2.)
-        TwoD_hdr['CRPIX1'] = xcen-xstart+1
+        TwoD_hdr['CRPIX1'] = xcen-xstart
 
 
     TwoD_hdr['CRVAL2'] = hdr['CRVAL3']
@@ -257,17 +262,25 @@ cpix = {centralpix} value = {linex[centralpix]}
                 (1 - float(TwoD_hdr['CRVAL2']) / c)
        
         else:
-            print(f'AS only the radio definition leads to equal increments in frequency we dont know how to make your PV-Diagram compliant')
+            log_statement += print(f'As only the radio definition leads to equal increments in frequency we dont know how to make your PV-Diagram compliant. \n')
         TwoD_hdr['CUNIT2'] = 'hz'
         #TwoD_hdr['SPECSYS'] = 'FREQ'
         TwoD_hdr['CTYPE2'] = 'FREQ'
        
-
-
-  
-    fits.writeto(f"{output_directory}/{output_name}",PV,TwoD_hdr,overwrite = overwrite)
     if close:
         cube.close()
+
+    if not output_name is None:
+        fits.writeto(f"{output_directory}/{output_name}_PV.fits",PV,TwoD_hdr,overwrite = overwrite)
+    else:
+        PV_diagram = copy.deepcopy(cube)
+        PV_diagram[0].data = PV
+        PV_diagram[0].header = TwoD_hdr
+        if log:
+            return PV_diagram,log_statement
+        else:
+            return PV_diagram
+   
     if log:
         return log_statement
 
@@ -329,11 +342,9 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         cube = fits.open(filename)
         close = True
 
-    if not output_directory:
+    if output_directory is None:
         output_directory= f'{os.getcwd()}'
-    if not output_name:
-        output_name= f'{os.path.splitext(os.path.split(filename)[1])[0]}'
-    
+   
     if cube_velocity_unit is None:
         if 'CUNIT3' not in cube[0].header:
             raise InputError(f"MOMENTS: Your CUNIT3 is missing, that is bad practice. You can use moments by setting cube_velocity_unit")
@@ -345,7 +356,10 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         elif cube[0].header['CUNIT3'] != cube_velocity_unit:
             raise InputError(f"You're input  cube velocity unit and the unit of the cube do not match.")  
     if mask:
-        mask_cube = fits.open(mask)
+        if isinstance(mask,str): 
+            mask_cube = fits.open(mask)
+        else:
+            mask_cube = mask 
         if len(np.where(mask_cube[0].data > 0.5)[0]) < 1:
            raise InputError(f'We expect mask values to start at 1 your mask has no values above 0.5')
 
@@ -357,10 +371,10 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
             cube[0].data[mask_cube[0].data < 0.5] = float('NaN')
         mask_cube.close()
     else:
-        if not level:
+        if level is None:
             level = threshold*np.mean([np.nanstd(cube[0].data[0:2,:,:]),np.nanstd(cube[0].data[-3:-1,:,:])])
         with np.errstate(invalid='ignore', divide='ignore'):
-            cube[0].data[cube[0].data < level] = float('NaN')
+            cube[0].data[cube[0].data <= level] = float('NaN')
     try:
         if map_velocity_unit is not None:
             if cube[0].header['CUNIT3'].lower().strip() == 'm/s' and map_velocity_unit.lower().strip() == 'km/s':
@@ -389,7 +403,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
     hdr2D.remove('CUNIT3')
     hdr2D.remove('CRPIX3')
     hdr2D.remove('CRVAL3')
-
+    moment_maps = []
     # we need a moment 1  for the moment 2 as well
     if 0 in moments:
         log_statement += print_log(f"MOMENTS: Creating a moment 0. \n", log)
@@ -399,9 +413,15 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         try:
             hdr2D['DATAMAX'] = np.nanmax(moment0)
             hdr2D['DATAMIN'] = np.nanmin(moment0)
-            fits.writeto(f"{output_directory}/{output_name}_mom0.fits",moment0,hdr2D,overwrite = overwrite)
+            if not output_name is None:
+                fits.writeto(f"{output_directory}/{output_name}_mom0.fits",moment0,hdr2D,overwrite = overwrite)
+            else:
+                mom0 = copy.deepcopy(cube)
+                mom0[0].header=hdr2D
+                mom0[0].data=moment0
+                moment_maps.append(mom0)
         except ValueError:
-            log_statement += print_log(f"MOMENTS: Your Moment 0 has bad data and we could not write the moment 0 fits file", log)
+            log_statement += print_log(f"MOMENTS: Your Moment 0 has bad data and we could not write the moment 0 fits file. \n", log)
             raise  InputError(f'Something went wrong in the moments module')
 
    
@@ -420,9 +440,16 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
             hdr2D['DATAMAX'] = np.nanmax(moment1)
             hdr2D['DATAMIN'] = np.nanmin(moment1)
             if 1 in moments:
-                fits.writeto(f"{output_directory}/{output_name}_mom1.fits",moment1,hdr2D,overwrite = overwrite)
+                if not output_name is None:
+                    fits.writeto(f"{output_directory}/{output_name}_mom1.fits",moment1,hdr2D,overwrite = overwrite)
+                else:
+                    mom1 = copy.deepcopy(cube)
+                    mom1[0].header=hdr2D
+                    mom1[0].data=moment1
+                    moment_maps.append(mom1)
+  
         except ValueError:
-            log_statement += print_log(f"MOMENTS: Your Moment 1 has bad data and we could not write the moment 1 fits file", log)
+            log_statement += print_log(f"MOMENTS: Your Moment 1 has bad data and we could not write the moment 1 fits file. \n", log)
             raise  InputError(f'Something went wrong in the moments module')
 
         if 2 in moments:
@@ -434,14 +461,26 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
             try: 
                 hdr2D['DATAMAX'] = np.nanmax(moment2)
                 hdr2D['DATAMIN'] = np.nanmin(moment2)
-                fits.writeto(f"{output_directory}/{output_name}_mom2.fits",moment2,hdr2D,overwrite = overwrite)
+                if not output_name is None:
+                    fits.writeto(f"{output_directory}/{output_name}_mom2.fits",moment2,hdr2D,overwrite = overwrite)
+                else:
+                    mom2 = copy.deepcopy(cube)
+                    mom2[0].header=hdr2D
+                    mom2[0].data=moment2
+                    moment_maps.append(mom2)
             except ValueError:
-                log_statement += print_log(f"MOMENTS: Your Moment 2 has bad data and we could not write the moment 2 fits file", log)
+                log_statement += print_log(f"MOMENTS: Your Moment 2 has bad data and we could not write the moment 2 fits file. \n", log)
                 raise  InputError(f'Something went wrong in the moments module')
 
     log_statement += print_log(f"MOMENTS: Finished moments.\n", log)
     if close:
         cube.close()
+  
+    if output_name is None:
+        if log:
+            return moment_maps,log_statement
+        else:
+            return moment_maps
     if log:
         return log_statement
 

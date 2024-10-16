@@ -25,7 +25,11 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
     log.write(warnings.formatwarning(message, category, filename, lineno, line))
 
 
+def main_PV():
+    main(sys.argv[1:],create_PV = True,makemoments=False)
 
+def main_moments():
+    main(sys.argv[1:])
 
 
 def main(argv,makemoments=True,create_PV = False):
@@ -70,7 +74,9 @@ Exiting moments.''')
     # read command line arguments anything list input should be set in '' e.g. pyROTMOD 'rotmass.MD=[1.4,True,True]'
     inputconf = OmegaConf.from_cli(argv)
     cfg = OmegaConf.merge(cfg,inputconf)
-    
+    if cfg.output_name is None:
+        cfg.output_name= f'{os.path.splitext(os.path.split(cfg.filename)[1])[0]}'
+
     if makemoments:
         if not cfg.mask and not cfg.level and not cfg.threshold:
             print(f'''You have to specify a mask, cutoff level (in cube units), or threshold (in sigma) to mask the cube with''')
@@ -87,6 +93,7 @@ Exiting moments.''')
                     cube_velocity_unit= cfg.cube_velocity_unit,PA=cfg.PA,\
                     center= cfg.center,finalsize=cfg.finalsize,\
                     convert= cfg.convert,log = cfg.log,\
+                    map_velocity_unit = cfg.map_velocity_unit,\
                     output_directory = cfg.output_directory,
                     restfreq=cfg.restfreq,carta=cfg.carta,
                     velocity_type = cfg.velocity_type,

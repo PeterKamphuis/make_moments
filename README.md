@@ -7,7 +7,7 @@ A stand alone version of the pyFAT make_moments and create xv_diagram function. 
 For moment maps:
 
 use as:
-  make_moments filename=Cub.fits mask=mask.fits
+  make_moments filename=<Cub.fits> mask=<mask.fits>
 
 If the maps already exist add overwrite=True
 
