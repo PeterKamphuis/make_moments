@@ -14,7 +14,7 @@ def get_config(moments_default=True,PV_default=False):
         log: Optional[str] = None   #possible log file for printing the output in
         output_name: Optional[str] = None   #string to use for out put, if set the output will be {output_name}_mom0.fits where the end is modified for the proper output
         output_directory: str = f'{os.getcwd()}' # directory where to put the output
-        debug: bool = False # Trigger to print additional info
+        debug: bool = True # Trigger to print additional info
         cube_velocity_unit: Optional[str] = None #Velocity units of the input cube 
         map_velocity_unit: Optional[str] = None #Requiested velocity units of the output
         overwrite: bool=False #Overwrite existing files?
