@@ -24,6 +24,11 @@ def warn_with_traceback(message, category, filename, lineno, file=None, line=Non
     traceback.print_stack(file=log)
     log.write(warnings.formatwarning(message, category, filename, lineno, line))
 
+def main_trace_moments():
+    from viztracer import VizTracer
+    with VizTracer(output_file="Moments_Viztracer.json",min_duration=1000) as tracer:
+        main_moments()
+
 
 def main_PV():
     main(sys.argv[1:],create_PV = True,makemoments=False)

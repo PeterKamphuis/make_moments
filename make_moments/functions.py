@@ -8,11 +8,13 @@ import copy
 import os
 import numpy as np
 import warnings
+import psutil
 
 class InputError(Exception):
     pass
 
-
+class MemoryError(Exception):
+    pass
 
 def print_log(log_statement,log=False):
     if log:
@@ -322,7 +324,8 @@ extract_pv.__doc__ = '''
 '''
 
 
-
+from memory_profiler import profile
+@profile
 def moments(filename = None, cube = None, mask = None, moments = None,overwrite = False,\
             level=None,cube_velocity_unit= None, map_velocity_unit= None,\
             threshold = 3.,debug = False, log=False,output_directory = None,output_name =None):
@@ -341,10 +344,13 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         InputError("MOMENTS: Give us a cube or a file but not both.")
     elif filename != None:
         cube = fits.open(filename)
+        #Not get the as float64 don't need that precision
+        cube[0].data.astype(np.float32) 
         close = True
     if output_directory is None:
         output_directory= f'{os.getcwd()}'
    
+  
     if cube_velocity_unit is None:
         if 'CUNIT3' not in cube[0].header:
             raise InputError(f"MOMENTS: Your CUNIT3 is missing, that is bad practice. You can use moments by setting cube_velocity_unit")
@@ -369,12 +375,14 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
            raise InputError(f'Your mask {mask_cube} and cube {filename} do not have the same dimensions')
         with np.errstate(invalid='ignore', divide='ignore'):
             cube[0].data[mask_cube[0].data < 0.5] = float('NaN')
+      
         mask_cube.close()
     else:
         if level is None:
             level = threshold*np.mean([np.nanstd(cube[0].data[0:2,:,:]),np.nanstd(cube[0].data[-3:-1,:,:])])
         with np.errstate(invalid='ignore', divide='ignore'):
             cube[0].data[cube[0].data <= level] = float('NaN')
+   
     try:
         if map_velocity_unit is not None:
             if cube[0].header['CUNIT3'].lower().strip() == 'm/s' and map_velocity_unit.lower().strip() == 'km/s':
@@ -426,66 +434,81 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
 
   
     if 1 in moments or 2 in moments:
+        memory_required =  2.5*cube[0].data.size* cube[0].data.itemsize/(1024*1024)
+        available_memory = psutil.virtual_memory().available/(1024*1024) 
+        print(f'We need {memory_required} and have {available_memory}')
+        if available_memory < memory_required:
+            raise MemoryError(f'Youre cube is too big for a VF or linewidth map, we will need {memory_required} Mb and have only {available_memory}')
+  
         log_statement += print_log(f"MOMENTS: Creating a moment 1. \n", log)
         zaxis = cube[0].header['CRVAL3'] + (np.arange(cube[0].header['NAXIS3'])+1 \
               - cube[0].header['CRPIX3']) * cube[0].header['CDELT3']
-        c=np.transpose(np.resize(zaxis,[cube[0].header['NAXIS1'],cube[0].header['NAXIS2'],len(zaxis)]),(2,1,0))
-        print(f'transposed 1')
+        c=np.transpose(np.resize(zaxis,[cube[0].header['NAXIS1']\
+                ,cube[0].header['NAXIS2'],len(zaxis)]),(2,1,0)).astype(np.float32)
+       
         hdr2D['BUNIT'] = f"{cube[0].header['CUNIT3']}"
         # Remember Python is stupid so z,y,x
         #with np.errstate(invalid='ignore', divide='ignore'):
-        print(np.nansum(cube[0].data))
-        print(c,cube[0].data)
-        print(f'fgh')
-        multiplied_cube = cube[0].data*c
-        print(multiplied_cube.shape)
-        split_count =1 
-        while multiplied_cube.size/split_count > 2e8:
-            split_count += 1
-        print(f'This is the split count ={split_count})')
-        if split_count > 1:
-            split_size = int(np.ceil(multiplied_cube.shape[0]/split_count))
-            print(split_size)
-            break_down_upper = []
-            break_down_lower = []
-            for i in range(0,split_count-1):
-                print(f'this time {i} lead to {(i+1)*split_size-1}')
-                break_down_upper.append(np.nansum(multiplied_cube\
-                    [i*split_size:(i+1)*split_size-1,:,:],axis=0))
-                break_down_lower.append(np.nansum(cube[0].data\
-                    [i*split_size:(i+1)*split_size-1,:,:],axis=0))
-            moment1 = np.nansum(break_down_upper)/np.nansum(break_down_lower)
-
-        else:
-            moment1 = np.nansum(multiplied_cube, axis=0)/ np.nansum(cube[0].data, axis=0) 
-        print(f'fgdffh')
-        moment1 = np.nansum(cube[0].data*c, axis=0)/ np.nansum(cube[0].data, axis=0)
-        print(f'summed')
-        print(moment1)
+       
+        
+        with np.errstate(invalid='ignore', divide='ignore'):
+            '''
+            if split_count > 1: 
+                break_down_upper = []
+                break_down_lower = []
+                for i in range(0,split_count):
+                    print(f'this time {i} lead to {(i+1)*split_size-1}')
+                    break_down_upper.append(np.nansum(cube[0].data\
+                        [i*split_size:(i+1)*split_size-1,:,:]*\
+                        c[i*split_size:(i+1)*split_size-1,:,:],axis=0))
+                    break_down_lower.append(np.nansum(cube[0].data\
+                        [i*split_size:(i+1)*split_size-1,:,:],axis=0))
+                moment1 = np.nansum(break_down_upper, axis=0)/np.nansum(break_down_lower, axis=0)
+                del break_down_upper
+            else:
+            '''
+            moment1 = np.nansum(cube[0].data*c, axis=0)/ np.nansum(cube[0].data, axis=0) 
+    
         moment1[np.invert(np.isfinite(moment1))] = float('NaN')
-        print(f'created 1')
         try:
             hdr2D['DATAMAX'] = np.nanmax(moment1)
             hdr2D['DATAMIN'] = np.nanmin(moment1)
             if 1 in moments:
                 if not output_name is None:
-
                     fits.writeto(f"{output_directory}/{output_name}_mom1.fits",moment1,hdr2D,overwrite = overwrite)
                 else:
                     mom1 = copy.deepcopy(cube)
                     mom1[0].header=hdr2D
                     mom1[0].data=moment1
                     moment_maps.append(mom1)
-  
+
         except ValueError:
             log_statement += print_log(f"MOMENTS: Your Moment 1 has bad data and we could not write the moment 1 fits file. \n", log)
             raise  InputError(f'Something went wrong in the moments module')
-        print(f'start 2')
+     
         if 2 in moments:
             log_statement += print_log(f"MOMENTS: Creating a moment 2. \n", log)
-            d = c - np.resize(moment1,[len(zaxis),cube[0].header['NAXIS2'],cube[0].header['NAXIS1']])
+          
+            d = c - np.resize(moment1,[len(zaxis),\
+                cube[0].header['NAXIS2'],cube[0].header['NAXIS1']]).astype(np.float32)
+            del c
+           
             with np.errstate(invalid='ignore', divide='ignore'):
-                moment2 = np.sqrt(np.nansum(cube[0].data*d**2, axis=0)/ np.nansum(cube[0].data, axis=0))
+                '''
+                if split_count > 1: 
+                    break_down_upper = []
+                    for i in range(0,split_count):
+                        print(f'this time {i} lead to {(i+1)*split_size-1}')
+                        break_down_upper.append(np.nansum(cube[0].data\
+                            [i*split_size:(i+1)*split_size-1,:,:]*\
+                            d[i*split_size:(i+1)*split_size-1,:,:]**2,axis=0))
+                    moment2 = np.sqrt(np.nansum(break_down_upper, axis=0)/np.nansum(break_down_lower, axis=0))
+
+                else:
+                '''
+                moment2 = np.sqrt(np.nansum(cube[0].data*d**2, axis=0)/ np.nansum(cube[0].data, axis=0)) 
+
+              
             moment2[np.invert(np.isfinite(moment1))] = float('NaN')
             print(f'created 2')
             try: 
