@@ -324,8 +324,6 @@ extract_pv.__doc__ = '''
 '''
 
 
-from memory_profiler import profile
-@profile
 def moments(filename = None, cube = None, mask = None, moments = None,overwrite = False,\
             level=None,cube_velocity_unit= None, map_velocity_unit= None,\
             threshold = 3.,debug = False, log=False,output_directory = None,output_name =None):
@@ -436,7 +434,6 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
     if 1 in moments or 2 in moments:
         memory_required =  2.5*cube[0].data.size* cube[0].data.itemsize/(1024*1024)
         available_memory = psutil.virtual_memory().available/(1024*1024) 
-        print(f'We need {memory_required} and have {available_memory}')
         if available_memory < memory_required:
             raise MemoryError(f'Youre cube is too big for a VF or linewidth map, we will need {memory_required} Mb and have only {available_memory}')
   
@@ -510,7 +507,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
 
               
             moment2[np.invert(np.isfinite(moment1))] = float('NaN')
-            print(f'created 2')
+           
             try: 
                 hdr2D['DATAMAX'] = np.nanmax(moment2)
                 hdr2D['DATAMIN'] = np.nanmin(moment2)
