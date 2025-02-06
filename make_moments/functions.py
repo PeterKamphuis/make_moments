@@ -2,6 +2,8 @@
 # This file containt the actual functions. It is these that are imported into pyFAT
 from astropy.io import fits
 from astropy.wcs import WCS
+from astropy.coordinates import SkyCoord
+from astropy import units as u
 from scipy import ndimage
 
 import copy
@@ -9,6 +11,7 @@ import os
 import numpy as np
 import warnings
 import psutil
+import re
 
 class InputError(Exception):
     pass
@@ -22,7 +25,108 @@ def print_log(log_statement,log=False):
     else:
         print(log_statement)
         return ''
+    # a Function to convert the RA and DEC into hour angle (invert = False, default) and vice versa
 
+def convertRADEC(RAin,DECin,invert=False, colon=False, verbose=False):
+    if verbose:
+        print(f'''CONVERTRADEC: Starting conversion from the following input.
+{'':8s}RA = {RAin}
+{'':8s}DEC = {DECin}
+''')
+    RA = copy.deepcopy(RAin)
+    DEC = copy.deepcopy(DECin)
+    if not invert:
+        try:
+            _ = (e for e in RA)
+        except TypeError:
+            RA= [RA]
+            DEC =[DEC]
+        for i in range(len(RA)):
+            xpos=RA
+            ypos=DEC
+            xposh=int(np.floor((xpos[i]/360.)*24.))
+            xposm=int(np.floor((((xpos[i]/360.)*24.)-xposh)*60.))
+            xposs=(((((xpos[i]/360.)*24.)-xposh)*60.)-xposm)*60
+            yposh=int(np.floor(np.absolute(ypos[i]*1.)))
+            yposm=int(np.floor((((np.absolute(ypos[i]*1.))-yposh)*60.)))
+            yposs=(((((np.absolute(ypos[i]*1.))-yposh)*60.)-yposm)*60)
+            sign=ypos[i]/np.absolute(ypos[i])
+            if colon:
+                RA[i]="{}:{}:{:2.2f}".format(xposh,xposm,xposs)
+                DEC[i]="{}:{}:{:2.2f}".format(yposh,yposm,yposs)
+            else:
+                RA[i]="{}h{}m{:2.2f}".format(xposh,xposm,xposs)
+                DEC[i]="{}d{}m{:2.2f}".format(yposh,yposm,yposs)
+            if sign < 0.: DEC[i]='-'+DEC[i]
+        if len(RA) == 1:
+            RA = str(RA[0])
+            DEC = str(DEC[0])
+    else:
+        if isinstance(RA,str):
+            RA=[RA]
+            DEC=[DEC]
+        else:
+            try:
+                _ = (e for e in RA)
+            except TypeError:
+                RA= [RA]
+                DEC =[DEC]
+
+        xpos=RA
+        ypos=DEC
+
+        for i in range(len(RA)):
+            # first we split the numbers out
+            tmp = re.split(r"[a-z,:]+",xpos[i])
+            RA[i]=(float(tmp[0])+((float(tmp[1])+(float(tmp[2])/60.))/60.))*15.
+            tmp = re.split(r"[a-z,:'\"]+",ypos[i])
+            if float(tmp[0]) != 0.:
+                DEC[i]=float(np.absolute(float(tmp[0]))+((float(tmp[1])+(float(tmp[2])/60.))/60.))*float(tmp[0])/np.absolute(float(tmp[0]))
+            else:
+                DEC[i] = float(np.absolute(float(tmp[0])) + ((float(tmp[1]) + (float(tmp[2]) / 60.)) / 60.))
+                if tmp[0][0] == '-':
+                    DEC[i] = float(DEC[i])*-1.
+        if len(RA) == 1:
+            RA= float(RA[0])
+            DEC = float(DEC[0])
+        else:
+            RA =np.array(RA,dtype=float)
+            DEC = np.array(DEC,dtype=float)
+    return RA,DEC
+convertRADEC.__doc__ =f'''
+ NAME:
+    convertRADEC
+
+ PURPOSE:
+    convert the RA and DEC in degre to a string with the hour angle
+
+ CATEGORY:
+    support_functions
+
+ INPUTS:
+    Configuration = Standard FAT configuration
+    RAin = RA to be converted
+    DECin = DEC to be converted
+
+ OPTIONAL INPUTS:
+
+
+    invert=False
+    if true input is hour angle string to be converted to degree
+
+    colon=False
+    hour angle separotor is : instead of hms
+
+ OUTPUTS:
+    converted RA, DEC as string list (hour angles) or numpy float array (degree)
+
+ OPTIONAL OUTPUTS:
+
+ PROCEDURES CALLED:
+    Unspecified
+
+ NOTE:
+'''
 # Extract a PV-Diagrams
 def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit= None,log = False,\
         map_velocity_unit = None,\
@@ -71,7 +175,11 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
 {'':8s} finalsize = {finalsize}
 {'':8s} convert = {convert}
 ''', log)
-
+    if type(center[0]) is str and type(center[1]) is str:
+        RA,DEC = convertRADEC(*center[:2],colon=True,invert=True)
+        center[0]=RA
+        center[1]=DEC
+  
     hdr = copy.deepcopy(cube[0].header)
     TwoD_hdr= copy.deepcopy(cube[0].header)
     data = copy.deepcopy(cube[0].data)
@@ -91,15 +199,22 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
     if all(x is None for x in center):
         center = [hdr['CRVAL1'],hdr['CRVAL2'],hdr['CRVAL3']]
         xcenter,ycenter,zcenter = hdr['CRPIX1'],hdr['CRPIX2'],hdr['CRPIX3']
+        print(convertRADEC(hdr['CRVAL1'],hdr['CRVAL2']))
     else:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             coordinate_frame = WCS(hdr)        
+        # 0. based because python is 0 based 
+        if hdr['CUNIT3'].lower() == 'm/s':
+            center[2] *=1000.   
+        #We want be the same as when reading header directly so 1 based
         xcenter,ycenter,zcenter = coordinate_frame.wcs_world2pix(center[0], center[1], center[2], 1.)
+        
     log_statement +=  print_log(f'''EXTRACT_PV: We get these pixels for the center,
 xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}              
 ''', log)
-    nz, ny, nx = data.shape
+   
+    nz, ny, nx =  data.shape
     if finalsize[0] != -1:
         if finalsize[1] >nz:
             finalsize[1] = nz
@@ -113,54 +228,33 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
 {'':8s} nx = {nx}
 ''', log)
    
-    x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[hdr['NAXIS1'],hdr['NAXIS2']])
-    
-    linex,liney,linez = np.linspace(x1,x2,nx), np.linspace(y1,y2,nx), np.linspace(0,nz-1,nz)
-
-    #We need to find our center in these coordinates
-    if x1 > x2 and y1 > y2:
-        offset = [(xcenter-x+ycenter-y) for x,y in zip (linex,liney)]
-    elif x1 < x2 and y1 > y2:
-        offset = [(x-xcenter+ycenter-y) for x,y in zip (linex,liney)]
-    elif x1 > x2 and y1 < y2:
-        offset = [(xcenter-x+y-ycenter) for x,y in zip (linex,liney)]
-    else:
-        offset = [(x-xcenter+y-ycenter) for x,y in zip (linex,liney)]
-    #for i in range(len(linex)):
-    #    print(f'{linex[i]} {i} {xcenter}  {liney[i]} {ycenter} {offset[i]}')
-    offset_abs = [abs(x) for x in offset]
-    if not np.isnan(np.nanmin(offset_abs)):
-        centralpix = offset_abs.index(np.nanmin(offset_abs))
-    else:
-        log_statement += print_log(f'''EXTRACT_PV: all our offset values are NaN
+    x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[nx,ny])
+    log_statement += print_log(f'''EXTRACT_PV: Border pixels are
+{'':8s} x = {x1}, {x2} 
+{'':8s} y = {y1}, {y2} 
 ''', log)
-        raise InputError(f'EXTRACT_PV: all our offset values are NaN')
-
-    if offset[centralpix] > 0:
-        xc1 =  centralpix-1
-        yc1 = offset[centralpix-1]
-        xc2 = centralpix
-        yc2 = offset[centralpix]
-    else:
-        xc1 = centralpix
-        yc1 = offset[centralpix]
-        xc2 = centralpix+1
-        yc2 = offset[centralpix+1]
-  
-    xcen = xc1+(xc2-xc1)*(-yc1/(yc2-yc1))
-    #if PA < 180.:
+    linex,liney,linez = np.linspace(x1,x2,nx), np.linspace(y1,y2,nx), np.linspace(0,nz-1,nz)
+    #Integer values are assumed to be the center of the pixel in wcs
+    offset = calc_offset(linex,liney,[xcenter,ycenter])
+    #for i in range(len(linex)):
+    #    print(f'xp = {linex[i]} yp = {liney[i]} off = {offset[i]} center = {xcenter}, {ycenter} i ={i}')
+    xcen,log_statement = calc_central_pix(offset,log_statement,log) 
     if y1 > y2:
         xcen= nx-xcen
-  
-
+    log_statement += print_log(f'''EXTRACT_PV: The central pixel on the extracted line is {xcen}
+''', log)
 
     #This only works when ny == nx hence nx is used in liney
+    #map_coordinates works 0 based 
     new_coordinates = np.array([(z,y,x)
                         for z in linez
                         for y,x in zip(liney,linex)
                         ],dtype=float).transpose().reshape((-1,nz,nx))
+    
     #spatial_resolution = abs((abs(x2-x1)/nx)*np.sin(np.radians(angle)))+abs(abs(y2-y1)/ny*np.cos(np.radians(angle)))
+  
     PV = ndimage.map_coordinates(data, new_coordinates,order=1)
+    print(PV.shape)
     if hdr['CDELT1'] < 0:
         PV = PV[:,::-1]
 
@@ -171,7 +265,8 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
         TwoD_hdr['NAXIS1'] = nx
 
         TwoD_hdr['CRPIX2'] = hdr['CRPIX3']
-        TwoD_hdr['CRPIX1'] = xcen
+        #fit is 1 based
+        TwoD_hdr['CRPIX1'] = xcen+1
     else:
         zstart = set_limits(int(zcenter-finalsize[1]/2.),0,int(nz))
         zend = set_limits(int(zcenter+finalsize[1]/2.),0,int(nz))
@@ -182,7 +277,7 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
         TwoD_hdr['NAXIS2'] = int(finalsize[1])
         TwoD_hdr['NAXIS1'] = int(finalsize[0])
         TwoD_hdr['CRPIX2'] = hdr['CRPIX3']-int(nz/2.-finalsize[1]/2.)
-        TwoD_hdr['CRPIX1'] = xcen-xstart
+        TwoD_hdr['CRPIX1'] = xcen-xstart+1
 
 
     TwoD_hdr['CRVAL2'] = hdr['CRVAL3']
@@ -322,7 +417,48 @@ extract_pv.__doc__ = '''
 
  NOTE:
 '''
+def calc_diff(val,center,min,max):
+    if min > max:
+        diff = center - val
+    else:
+        diff = val -center
+    return diff
 
+def calc_offset(x,y,center):
+    #We need to find our center in these coordinates
+    offset = []
+    for xp,yp in zip(x,y):
+        #the center is 1 based and the lines 0 based so we need to reduce the center by 1
+        xcontr = calc_diff(xp, center[0],x[0],x[-1])
+        ycontr = calc_diff(yp, center[1],y[0],y[-1])
+        offset.append(np.sqrt((xcontr)**2+(ycontr)**2))
+        if xp < center[0]-1:
+            offset[-1] *= -1
+    return offset
+
+def calc_central_pix(offset,log_statement,log):
+    offset_abs = [abs(x) for x in offset]
+    if not np.isnan(np.nanmin(offset_abs)):
+        centralpix = offset_abs.index(np.nanmin(offset_abs))
+    else:
+        log_statement += print_log(f'''EXTRACT_PV: all our offset values are NaN
+''', log)
+        raise InputError(f'EXTRACT_PV: all our offset values are NaN')
+    if offset[centralpix] > 0:
+        xc1 =  centralpix-1
+        yc1 = offset[centralpix-1]
+        xc2 = centralpix
+        yc2 = offset[centralpix]
+    else:
+        xc1 = centralpix
+        yc1 = offset[centralpix]
+        xc2 = centralpix+1
+        yc2 = offset[centralpix+1]
+  
+    xcen = xc1+(xc2-xc1)*(-yc1/(yc2-yc1))
+   
+    return xcen,log_statement
+  
 
 def moments(filename = None, cube = None, mask = None, moments = None,overwrite = False,\
             level=None,cube_velocity_unit= None, map_velocity_unit= None,\
@@ -592,7 +728,11 @@ moments.__doc__ =f'''
 '''
 
 def obtain_border_pix(angle,center, naxes):
+   
     rotate = False
+    # This should be all 0 based for the triginometry to work
+    naxes = [x-1. for x in naxes]
+    center = [x-1 for x in center]
     # only setup for 0-180 but 180.-360 is the same but -180
     if angle > 180.:
         angle -= 180.
@@ -602,7 +742,7 @@ def obtain_border_pix(angle,center, naxes):
         x1 = center[0]-(naxes[1]-center[1])*np.tan(np.radians(angle))
         x2 = center[0]+(center[1])*np.tan(np.radians(angle))
         if x1 < 0:
-            x1 = 0
+            x1 = 0.
             y1 = center[1]+(center[0])*np.tan(np.radians(90-angle))
         else:
             y1 = naxes[1]
@@ -610,23 +750,26 @@ def obtain_border_pix(angle,center, naxes):
             x2 = naxes[0]
             y2 = center[1]-(center[0])*np.tan(np.radians(90-angle))
         else:
-            y2 = 0
+            y2 = 0.
     elif angle == 90:
-        x1 = 0 ; y1 = center[1] ; x2 = naxes[0]; y2 = center[1]
+        x1 = 0. ; y1 = center[1] ; x2 = naxes[0]; y2 = center[1]
     else:
         x1 = center[0]-(center[1])*np.tan(np.radians(180.-angle))
         x2 = center[0]+(naxes[1]-center[1])*np.tan(np.radians(180-angle))
         if x1 < 0:
-            x1 = 0
+            x1 = 0.
             y1 = center[1]-(center[0])*np.tan(np.radians(angle-90))
         else:
-            y1 = 0
+            y1 = 0.
         if x2 > naxes[0]:
             x2 = naxes[0]
             y2 = center[1]+(center[0])*np.tan(np.radians(angle-90))
         else:
             y2 = naxes[1]
+        print(x1,x2,y1,y2)
+      
     # if the orginal angle was > 180 we need to give the line 180 deg rotation
+    #We need these to be 0 based for map coordinates
     x = [x1,x2]
     y = [y1,y2]
     if rotate:
