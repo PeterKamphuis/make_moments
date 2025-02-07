@@ -1,5 +1,5 @@
 # -*- coding: future_fstrings -*-
-# This file containt the actual functions. It is these that are imported into pyFAT
+# This file contains the actual functions. It is these that are imported into pyFAT
 from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.coordinates import SkyCoord
@@ -199,12 +199,12 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
     if all(x is None for x in center):
         center = [hdr['CRVAL1'],hdr['CRVAL2'],hdr['CRVAL3']]
         xcenter,ycenter,zcenter = hdr['CRPIX1'],hdr['CRPIX2'],hdr['CRPIX3']
-        print(convertRADEC(hdr['CRVAL1'],hdr['CRVAL2']))
+        if debug:
+            log_statement += print_log(convertRADEC(hdr['CRVAL1'],hdr['CRVAL2']),log)
     else:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             coordinate_frame = WCS(hdr)        
-        # 0. based because python is 0 based 
         if hdr['CUNIT3'].lower() == 'm/s':
             center[2] *=1000.   
         #We want be the same as when reading header directly so 1 based
@@ -214,30 +214,32 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
 xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}              
 ''', log)
    
-    nz, ny, nx =  data.shape
+    nz, ny, nx = data.shape
     if finalsize[0] != -1:
         if finalsize[1] >nz:
             finalsize[1] = nz
         if finalsize[0] > nx:
             finalsize[0] = nx
     # if the center is not set assume the crval values
-
-    log_statement += print_log(f'''EXTRACT_PV: The shape of the output
+    if debug:
+        log_statement += print_log(f'''EXTRACT_PV: The shape of the output
 {'':8s} nz = {nz}
 {'':8s} ny = {ny}
 {'':8s} nx = {nx}
 ''', log)
    
     x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[nx,ny])
-    log_statement += print_log(f'''EXTRACT_PV: Border pixels are
+    if debug:
+        log_statement += print_log(f'''EXTRACT_PV: Border pixels are
 {'':8s} x = {x1}, {x2} 
 {'':8s} y = {y1}, {y2} 
 ''', log)
     linex,liney,linez = np.linspace(x1,x2,nx), np.linspace(y1,y2,nx), np.linspace(0,nz-1,nz)
     #Integer values are assumed to be the center of the pixel in wcs
     offset = calc_offset(linex,liney,[xcenter,ycenter])
-    #for i in range(len(linex)):
-    #    print(f'xp = {linex[i]} yp = {liney[i]} off = {offset[i]} center = {xcenter}, {ycenter} i ={i}')
+    if debug:
+        for i in range(len(linex)):
+            log_statement += print_log(f'xp = {linex[i]} yp = {liney[i]} off = {offset[i]} center = {xcenter}, {ycenter} i ={i}',log)
     xcen,log_statement = calc_central_pix(offset,log_statement,log) 
     if y1 > y2:
         xcen= nx-xcen
@@ -254,7 +256,7 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
     #spatial_resolution = abs((abs(x2-x1)/nx)*np.sin(np.radians(angle)))+abs(abs(y2-y1)/ny*np.cos(np.radians(angle)))
   
     PV = ndimage.map_coordinates(data, new_coordinates,order=1)
-    print(PV.shape)
+  
     if hdr['CDELT1'] < 0:
         PV = PV[:,::-1]
 
@@ -350,7 +352,7 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
         # Needs the the spectral axis in frequency even when the original axis is in velocity which is simply ridiculous
         if restfreq == None:
             restfreq = 1.420405751767E+09
-        c=299792458 # In meter/s
+        c=299792458. # In meter/s
         if  TwoD_hdr['CUNIT2'].lower() == 'km/s':
             c = c/1000.
         if  TwoD_hdr['CTYPE2'] == 'VRAD':
@@ -432,7 +434,7 @@ def calc_offset(x,y,center):
         xcontr = calc_diff(xp, center[0],x[0],x[-1])
         ycontr = calc_diff(yp, center[1],y[0],y[-1])
         offset.append(np.sqrt((xcontr)**2+(ycontr)**2))
-        if xp < center[0]-1:
+        if xp < center[0]:
             offset[-1] *= -1
     return offset
 
@@ -766,7 +768,6 @@ def obtain_border_pix(angle,center, naxes):
             y2 = center[1]+(center[0])*np.tan(np.radians(angle-90))
         else:
             y2 = naxes[1]
-        print(x1,x2,y1,y2)
       
     # if the orginal angle was > 180 we need to give the line 180 deg rotation
     #We need these to be 0 based for map coordinates

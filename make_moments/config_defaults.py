@@ -125,6 +125,6 @@ Use {program} in this way:
 in this file values designated ??? indicated values without defaults.
 
 All config parameters can be set directly from the command line by setting the correct parameters, e.g:
-make_moments filename=cube.fits mask=mask.fits to make moment maps of the file cube.fits where the maps are masked with mask.fits
+{program} cube_name=cube.fits mask=mask.fits to make moment maps of the file cube.fits where the maps are masked with mask.fits
 '''
     return help_message   
