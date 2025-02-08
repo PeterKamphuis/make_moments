@@ -21,7 +21,7 @@ def get_config(moments_default=True,PV_default=False):
         log: Optional[str] = None   #possible log file for printing the output in
         output_name: Optional[str] = None   #string to use for out put, if set the output will be {output_name}_mom0.fits where the end is modified for the proper output
         output_directory: str = f'{os.getcwd()}' # directory where to put the output
-        debug: bool = True # Trigger to print additional info
+        debug: bool = False # Trigger to print additional info
         cube_velocity_unit: Optional[str] = None #Velocity units of the input cube 
         map_velocity_unit: Optional[str] = None #Requiested velocity units of the output
         overwrite: bool=False #Overwrite existing files?
@@ -77,7 +77,7 @@ def process_input(argv,moments_default=True,PV_default=False):
     # Print examples if requested
     if cfg_input.print_examples:
         with open(file_name,'w') as default_write:
-            default_write.write(OmegaConf.to_yaml(cfg_input))
+            default_write.write(OmegaConf.to_yaml(cfg))
         print(f'''We have printed the file {file_name} in {os.getcwd()}.
 ''')
         sys.exit()

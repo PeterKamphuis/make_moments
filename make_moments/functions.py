@@ -228,7 +228,8 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
 {'':8s} nx = {nx}
 ''', log)
    
-    x1,x2,y1,y2 = obtain_border_pix(PA,[xcenter,ycenter],[nx,ny])
+    x1,x2,y1,y2,log_statement = obtain_border_pix(PA,[xcenter,ycenter],\
+            [nx,ny],log_statement,log,debug=debug)
     if debug:
         log_statement += print_log(f'''EXTRACT_PV: Border pixels are
 {'':8s} x = {x1}, {x2} 
@@ -240,9 +241,9 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
     if debug:
         for i in range(len(linex)):
             log_statement += print_log(f'xp = {linex[i]} yp = {liney[i]} off = {offset[i]} center = {xcenter}, {ycenter} i ={i}',log)
-    xcen,log_statement = calc_central_pix(offset,log_statement,log) 
-    if y1 > y2:
-        xcen= nx-xcen
+    xcen,log_statement = calc_central_pix(offset,log_statement,log,debug=debug) 
+    #if y1 > y2 or x1 > x2:
+    xcen= nx-xcen-1
     log_statement += print_log(f'''EXTRACT_PV: The central pixel on the extracted line is {xcen}
 ''', log)
 
@@ -254,7 +255,7 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
                         ],dtype=float).transpose().reshape((-1,nz,nx))
     
     #spatial_resolution = abs((abs(x2-x1)/nx)*np.sin(np.radians(angle)))+abs(abs(y2-y1)/ny*np.cos(np.radians(angle)))
-  
+    #print(new_coordinates)
     PV = ndimage.map_coordinates(data, new_coordinates,order=1)
   
     if hdr['CDELT1'] < 0:
@@ -428,6 +429,7 @@ def calc_diff(val,center,min,max):
 
 def calc_offset(x,y,center):
     #We need to find our center in these coordinates
+    center = [x-1 for x in center]
     offset = []
     for xp,yp in zip(x,y):
         #the center is 1 based and the lines 0 based so we need to reduce the center by 1
@@ -438,7 +440,7 @@ def calc_offset(x,y,center):
             offset[-1] *= -1
     return offset
 
-def calc_central_pix(offset,log_statement,log):
+def calc_central_pix(offset,log_statement,log,debug=False):
     offset_abs = [abs(x) for x in offset]
     if not np.isnan(np.nanmin(offset_abs)):
         centralpix = offset_abs.index(np.nanmin(offset_abs))
@@ -446,6 +448,10 @@ def calc_central_pix(offset,log_statement,log):
         log_statement += print_log(f'''EXTRACT_PV: all our offset values are NaN
 ''', log)
         raise InputError(f'EXTRACT_PV: all our offset values are NaN')
+    if debug:
+         log_statement += print_log(f'''EXTRACT_PV: The minimum initial pixel is {centralpix}
+With an offset of {offset[centralpix]}
+''',log)
     if offset[centralpix] > 0:
         xc1 =  centralpix-1
         yc1 = offset[centralpix-1]
@@ -456,8 +462,14 @@ def calc_central_pix(offset,log_statement,log):
         yc1 = offset[centralpix]
         xc2 = centralpix+1
         yc2 = offset[centralpix+1]
-  
+    
+
     xcen = xc1+(xc2-xc1)*(-yc1/(yc2-yc1))
+    if debug:
+         log_statement += print_log(f'''EXTRACT_PV: From the values:
+x1 = {xc1}, x2 = {xc2}, y1 = {yc1}, y2 = {yc2},
+We get xcen = {xcen}
+''',log)
    
     return xcen,log_statement
   
@@ -729,12 +741,12 @@ moments.__doc__ =f'''
  NOTE:
 '''
 
-def obtain_border_pix(angle,center, naxes):
+def obtain_border_pix(angle,center, naxes,log_statement,log,debug=False):
    
     rotate = False
     # This should be all 0 based for the triginometry to work
     naxes = [x-1. for x in naxes]
-    center = [x-1 for x in center]
+    center = [x-1. for x in center]
     # only setup for 0-180 but 180.-360 is the same but -180
     if angle > 180.:
         angle -= 180.
@@ -743,6 +755,10 @@ def obtain_border_pix(angle,center, naxes):
     if angle < 90.:
         x1 = center[0]-(naxes[1]-center[1])*np.tan(np.radians(angle))
         x2 = center[0]+(center[1])*np.tan(np.radians(angle))
+        if debug: 
+            log_statement += print_log(f'''EXTRACT_PV: The first x guesses are:
+x1 = {x1} and x2 = {x2}
+''',log)
         if x1 < 0:
             x1 = 0.
             y1 = center[1]+(center[0])*np.tan(np.radians(90-angle))
@@ -750,9 +766,13 @@ def obtain_border_pix(angle,center, naxes):
             y1 = naxes[1]
         if x2 > naxes[0]:
             x2 = naxes[0]
-            y2 = center[1]-(center[0])*np.tan(np.radians(90-angle))
+            y2 = center[1]-(naxes[0]-center[0])*np.tan(np.radians(90-angle))
         else:
             y2 = 0.
+        if debug:
+            log_statement += print_log(f'''EXTRACT_PV: After correcting for size we get
+x1 = {x1} and x2 = {x2}, y1 = {y1} and y2 = {y2},
+''',log)
     elif angle == 90:
         x1 = 0. ; y1 = center[1] ; x2 = naxes[0]; y2 = center[1]
     else:
@@ -776,7 +796,7 @@ def obtain_border_pix(angle,center, naxes):
     if rotate:
         x.reverse()
         y.reverse()
-    return (*x,*y)
+    return (*x,*y,log_statement)
 
 obtain_border_pix.__doc__ =f'''
  NAME:
