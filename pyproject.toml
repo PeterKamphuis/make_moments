@@ -23,6 +23,7 @@ classifiers = [
 dependencies = [ 'numpy>=1.14',
     'omegaconf',
     'scipy',
+    'psutil',
     'astropy',
     'future-fstrings',
     'importlib_resources>=3.3.0',
@@ -35,6 +36,7 @@ Homepage = "https://github.com/PeterKamphuis/make_moments"
 [project.scripts]
 create_PV_diagram = "make_moments.main:main_PV"
 make_moments = "make_moments.main:main_moments"
+trace_moments = "make_moments.main:main_trace_moments"
 
 [tool.hatch.version]
 path = "version.py"
