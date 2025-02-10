@@ -243,7 +243,7 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
             log_statement += print_log(f'xp = {linex[i]} yp = {liney[i]} off = {offset[i]} center = {xcenter}, {ycenter} i ={i}',log)
     xcen,log_statement = calc_central_pix(offset,log_statement,log,debug=debug) 
     #if y1 > y2 or x1 > x2:
-    xcen= nx-xcen-1
+   
     log_statement += print_log(f'''EXTRACT_PV: The central pixel on the extracted line is {xcen}
 ''', log)
 
@@ -260,6 +260,7 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
   
     if hdr['CDELT1'] < 0:
         PV = PV[:,::-1]
+        xcen= nx-xcen-1
 
     if finalsize[0] == -1:
         # then lets update the header
