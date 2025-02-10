@@ -589,7 +589,7 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         memory_required =  2.5*cube[0].data.size* cube[0].data.itemsize/(1024*1024)
         available_memory = psutil.virtual_memory().available/(1024*1024) 
         if available_memory < memory_required:
-            raise MemoryError(f'Youre cube is too big for a VF or linewidth map, we will need {memory_required} Mb and have only {available_memory}')
+            raise MemoryError(f"You're cube is too big for a VF or linewidth map, we will need {memory_required} Mb and have only {available_memory}")
   
         log_statement += print_log(f"MOMENTS: Creating a moment 1. \n", log)
         zaxis = cube[0].header['CRVAL3'] + (np.arange(cube[0].header['NAXIS3'])+1 \
