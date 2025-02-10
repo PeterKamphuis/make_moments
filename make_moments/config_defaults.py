@@ -12,6 +12,9 @@ class InputError(Exception):
     pass
 
 
+def get_default_center():
+    return ['RA ("hh:mm:ss" or deg)','DEC ("hh:mm:ss" or deg)','v_sys (km/s)']
+
 def get_config(moments_default=True,PV_default=False):
 
     @dataclass
@@ -38,7 +41,7 @@ def get_config(moments_default=True,PV_default=False):
             threshold: float = 3. #Same as level but calculates level as threshold * cube_rms
         if PV_default:
             PA: float = 16 #Position angle where to extract PV
-            center: List = field(default_factory=lambda: ['RA ("hh:mm:ss" or deg)','DEC ("hh:mm:ss" or deg)','v_sys (km/s)']) #Central position of extraction in wcs
+            center: List = field(default_factory=lambda: get_default_center()) #Central position of extraction in wcs
             finalsize: List= field(default_factory=lambda: [-1,-1,-1]) #final size of output in pixels
             convert: float = -1. #conversion factor for velocity axis
             carta: bool = False #Carta will only accept stupid fequency axis
@@ -99,17 +102,15 @@ Else press CTRL-C to abort.
 configuration_file = ''')
     # make sure the command line overwrite the file
     cfg = OmegaConf.merge(cfg,inputconf)
-    
+    if PV_default:
+        if cfg.center == get_default_center():
+            cfg.center= [None for x in cfg.center]
+
     if moments_default:
         if not cfg.mask and not cfg.level and not cfg.threshold:
             print(f'''You have to specify a mask, cutoff level (in cube units), or threshold (in sigma) to mask the cube with''')
             sys.exit(1)
-    #if not any([cfg.cube_name, cfg.configuration_file, cfg.installation_check\
-    #            ,cfg.print_examples,cfg.input.catalogue]):
-    #    raise InputError(f'''You have not provided a cube_name, configuration_file or input_catalogue
-#nor requested the installation_check or print_examples.
-#We are crashes because that means you want to do nothing.''')
-    
+   
     #set an output base name
     if cfg.output_name is None:
         cfg.output_name= f'{os.path.splitext(os.path.split(cfg.cube_name)[1])[0]}'

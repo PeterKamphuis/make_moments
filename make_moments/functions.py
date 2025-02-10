@@ -200,7 +200,7 @@ def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit=
         center = [hdr['CRVAL1'],hdr['CRVAL2'],hdr['CRVAL3']]
         xcenter,ycenter,zcenter = hdr['CRPIX1'],hdr['CRPIX2'],hdr['CRPIX3']
         if debug:
-            log_statement += print_log(convertRADEC(hdr['CRVAL1'],hdr['CRVAL2']),log)
+            log_statement += print_log(f'We are using the following center = {convertRADEC(hdr["CRVAL1"],hdr["CRVAL2"])}',log)
     else:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -243,8 +243,8 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
             log_statement += print_log(f'xp = {linex[i]} yp = {liney[i]} off = {offset[i]} center = {xcenter}, {ycenter} i ={i}',log)
     xcen,log_statement = calc_central_pix(offset,log_statement,log,debug=debug) 
     #if y1 > y2 or x1 > x2:
-   
-    log_statement += print_log(f'''EXTRACT_PV: The central pixel on the extracted line is {xcen}
+    if debug:
+        log_statement += print_log(f'''EXTRACT_PV: The central pixel on the extracted line is {xcen}
 ''', log)
 
     #This only works when ny == nx hence nx is used in liney
@@ -261,6 +261,9 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
     if hdr['CDELT1'] < 0:
         PV = PV[:,::-1]
         xcen= nx-xcen-1
+        log_statement += print_log(f'''EXTRACT_PV: To account for the negative increment in CDELT1 we are reversing the output.
+The central pixel used in the PV is {xcen}.
+''', log)
 
     if finalsize[0] == -1:
         # then lets update the header
