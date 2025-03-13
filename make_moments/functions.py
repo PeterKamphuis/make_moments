@@ -514,8 +514,10 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
         elif cube[0].header['CUNIT3'] != cube_velocity_unit:
             raise InputError(f"You're input  cube velocity unit and the unit of the cube do not match.")  
     if mask:
+        close_mask = False
         if isinstance(mask,str): 
             mask_cube = fits.open(mask)
+            close_mask = True
         else:
             mask_cube = mask 
         if len(np.where(mask_cube[0].data > 0.5)[0]) < 1:
@@ -527,8 +529,8 @@ def moments(filename = None, cube = None, mask = None, moments = None,overwrite 
            raise InputError(f'Your mask {mask_cube} and cube {filename} do not have the same dimensions')
         with np.errstate(invalid='ignore', divide='ignore'):
             cube[0].data[mask_cube[0].data < 0.5] = float('NaN')
-      
-        mask_cube.close()
+        if close_mask:
+            mask_cube.close()
     else:
         if level is None:
             level = threshold*np.mean([np.nanstd(cube[0].data[0:2,:,:]),np.nanstd(cube[0].data[-3:-1,:,:])])
