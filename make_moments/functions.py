@@ -314,7 +314,8 @@ The central pixel used in the PV is {xcen}.
     del (TwoD_hdr['CTYPE3'])
     del (TwoD_hdr['NAXIS3'])
     #del (TwoD_hdr['EPOCH'])
-
+    if 'WCSAXES' in TwoD_hdr:
+        del (TwoD_hdr['WCSAXES'])
     TwoD_hdr['NAXIS'] = 2
     TwoD_hdr['CRVAL1'] = 0.
     #Because we used nx in the linspace for liney we also use it here
