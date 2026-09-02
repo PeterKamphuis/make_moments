@@ -257,10 +257,11 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
     #spatial_resolution = abs((abs(x2-x1)/nx)*np.sin(np.radians(angle)))+abs(abs(y2-y1)/ny*np.cos(np.radians(angle)))
     #print(new_coordinates)
     PV = ndimage.map_coordinates(data, new_coordinates,order=1)
-  
+    log_statement += print_log(f'''EXTRACT_PV: The extracted shape is {PV.shape}''',log)
+
     if hdr['CDELT1'] < 0:
         PV = PV[:,::-1]
-        xcen= nx-xcen-1
+        xcen= set_limits(nx-xcen-1, 0, nx)
         log_statement += print_log(f'''EXTRACT_PV: To account for the negative increment in CDELT1 we are reversing the output.
 The central pixel used in the PV is {xcen}.
 ''', log)
@@ -268,25 +269,33 @@ The central pixel used in the PV is {xcen}.
     if finalsize[0] == -1:
         # then lets update the header
         # As python is stupid making a simple copy will mean that these changes are still applied to hudulist
-        TwoD_hdr['NAXIS2'] = nz
         TwoD_hdr['NAXIS1'] = nx
-
-        TwoD_hdr['CRPIX2'] = hdr['CRPIX3']
         #fit is 1 based
         TwoD_hdr['CRPIX1'] = xcen+1
+        xstart=0
+        xend = nx
     else:
-        zstart = set_limits(int(zcenter-finalsize[1]/2.),0,int(nz))
-        zend = set_limits(int(zcenter+finalsize[1]/2.),0,int(nz))
-        xstart = set_limits(int(xcen-finalsize[0]/2.),0,int(nx))
-        xend = set_limits(int(xcen+finalsize[0]/2.),0,int(nx))
-
-        PV =  PV[zstart:zend, xstart:xend]
-        TwoD_hdr['NAXIS2'] = int(finalsize[1])
+        xstart = set_limits(int(xcen-finalsize[0]/2.),0,int(nx-finalsize[0]))
+        xend = set_limits(int(xcen+finalsize[0]/2.),xstart+int(finalsize[0]),int(nx))
         TwoD_hdr['NAXIS1'] = int(finalsize[0])
-        TwoD_hdr['CRPIX2'] = hdr['CRPIX3']-int(nz/2.-finalsize[1]/2.)
         TwoD_hdr['CRPIX1'] = xcen-xstart+1
 
-
+    if finalsize[1] == -1:
+        TwoD_hdr['NAXIS2'] = nz
+        TwoD_hdr['CRPIX2'] = hdr['CRPIX3']
+        zstart=0
+        zend = nz
+    else:
+        zstart = set_limits(int(zcenter-finalsize[1]/2.),0,int(nz-finalsize[1]))
+        zend = set_limits(int(zcenter+finalsize[1]/2.),zstart+int(finalsize[1]),int(nz))
+        TwoD_hdr['NAXIS2'] = int(finalsize[1])
+        TwoD_hdr['CRPIX2'] = hdr['CRPIX3']-int(nz/2.-finalsize[1]/2.)
+    if debug:
+        log_statement += print_log(f'''EXTRACT_PV: Slicing with the following limits: xstart = {xstart}, xend = {xend}, zstart = {zstart}, zend = {zend}'''
+            ,log)
+    PV =  PV[zstart:zend, xstart:xend]
+    if debug:
+        log_statement += print_log(f'''EXTRACT_PV: The shape after slicing is {PV.shape}''',log)
     TwoD_hdr['CRVAL2'] = hdr['CRVAL3']
     TwoD_hdr['CDELT2'] = hdr['CDELT3']
     TwoD_hdr['CTYPE2'] = hdr['CTYPE3']
