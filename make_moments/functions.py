@@ -131,7 +131,7 @@ convertRADEC.__doc__ =f'''
 def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit= None,log = False,\
         map_velocity_unit = None,\
         PA=0.,center= [None, None, None],finalsize=None,convert=-1,restfreq = None,silent=False,velocity_type= None,\
-        output_directory = None,output_name =None,debug =False, spectral_frame= None, carta=False):
+        output_directory = None,output_name =None,debug =False, spectral_frame= None, carta=False, thickness=0.):
     log_statement = ''
    
     if finalsize is None:
@@ -257,6 +257,31 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
     #spatial_resolution = abs((abs(x2-x1)/nx)*np.sin(np.radians(angle)))+abs(abs(y2-y1)/ny*np.cos(np.radians(angle)))
     #print(new_coordinates)
     PV = ndimage.map_coordinates(data, new_coordinates,order=1)
+    if thickness is not None and thickness < 0:
+        raise InputError(f"EXTRACT_PV: thickness must be positive or zero, got {thickness}.")
+    if thickness > 0:
+        # Integrate over a strip centred on the slice before discarding the
+        # perpendicular axis. thickness is measured in pixels of the cube.
+        dx = x2 - x1
+        dy = y2 - y1
+        line_length = np.hypot(dx, dy)
+        if line_length == 0:
+            raise InputError("EXTRACT_PV: your PV slice has zero length, so there is no perpendicular width to integrate over.")
+        px = -dy / line_length
+        py = dx / line_length
+        n_samples = max(2, int(np.ceil(thickness)))
+        offsets = np.linspace(-0.5*thickness, 0.5*thickness, n_samples)
+        PV_strip = []
+        for offset in offsets:
+            xoff = linex + px * offset
+            yoff = liney + py * offset
+            new_coordinates_off = np.array([(z,y,x)
+                        for z in linez
+                        for y,x in zip(yoff,xoff)
+                        ],dtype=float).transpose().reshape((-1,nz,nx))
+            PV_strip.append(ndimage.map_coordinates(data, new_coordinates_off,order=1))
+        PV = np.sum(PV_strip, axis=0)
+        log_statement += print_log(f'''EXTRACT_PV: Integrated the PV slice over a thickness of {thickness} pixels before discarding the perpendicular axis.''',log)
     log_statement += print_log(f'''EXTRACT_PV: The extracted shape is {PV.shape}''',log)
 
     if hdr['CDELT1'] < 0:
@@ -422,6 +447,10 @@ extract_pv.__doc__ = '''
 
     convert=-1
     conversion factor for velocity axis, default no conversion
+
+    thickness=0.
+    width of the strip perpendicular to the slice, in pixels, integrated before the
+    perpendicular axis is discarded. Values > 0 sum over that width.
 
  KEYWORD PARAMETERS:
 
