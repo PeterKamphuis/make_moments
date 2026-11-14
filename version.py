@@ -2,5 +2,5 @@
 
 
 PACKAGE_NAME = 'make_moments'
-__version__ = '1.1.1'
+__version__ = '1.1.2'
 

@@ -131,7 +131,7 @@ convertRADEC.__doc__ =f'''
 def extract_pv(filename = None,cube= None, overwrite = False,cube_velocity_unit= None,log = False,\
         map_velocity_unit = None,\
         PA=0.,center= [None, None, None],finalsize=None,convert=-1,restfreq = None,silent=False,velocity_type= None,\
-        output_directory = None,output_name =None,debug =False, spectral_frame= None, carta=False):
+        output_directory = None,output_name =None,debug =False, spectral_frame= None, carta=False, thickness=0.):
     log_statement = ''
    
     if finalsize is None:
@@ -257,10 +257,36 @@ xcenter={xcenter}, ycenter={ycenter}, zcenter={zcenter}
     #spatial_resolution = abs((abs(x2-x1)/nx)*np.sin(np.radians(angle)))+abs(abs(y2-y1)/ny*np.cos(np.radians(angle)))
     #print(new_coordinates)
     PV = ndimage.map_coordinates(data, new_coordinates,order=1)
-  
+    if thickness is not None and thickness < 0:
+        raise InputError(f"EXTRACT_PV: thickness must be positive or zero, got {thickness}.")
+    if thickness > 0:
+        # Integrate over a strip centred on the slice before discarding the
+        # perpendicular axis. thickness is measured in pixels of the cube.
+        dx = x2 - x1
+        dy = y2 - y1
+        line_length = np.hypot(dx, dy)
+        if line_length == 0:
+            raise InputError("EXTRACT_PV: your PV slice has zero length, so there is no perpendicular width to integrate over.")
+        px = -dy / line_length
+        py = dx / line_length
+        n_samples = max(2, int(np.ceil(thickness)))
+        offsets = np.linspace(-0.5*thickness, 0.5*thickness, n_samples)
+        PV_strip = []
+        for offset in offsets:
+            xoff = linex + px * offset
+            yoff = liney + py * offset
+            new_coordinates_off = np.array([(z,y,x)
+                        for z in linez
+                        for y,x in zip(yoff,xoff)
+                        ],dtype=float).transpose().reshape((-1,nz,nx))
+            PV_strip.append(ndimage.map_coordinates(data, new_coordinates_off,order=1))
+        PV = np.sum(PV_strip, axis=0)
+        log_statement += print_log(f'''EXTRACT_PV: Integrated the PV slice over a thickness of {thickness} pixels before discarding the perpendicular axis.''',log)
+    log_statement += print_log(f'''EXTRACT_PV: The extracted shape is {PV.shape}''',log)
+
     if hdr['CDELT1'] < 0:
         PV = PV[:,::-1]
-        xcen= nx-xcen-1
+        xcen= set_limits(nx-xcen-1, 0, nx)
         log_statement += print_log(f'''EXTRACT_PV: To account for the negative increment in CDELT1 we are reversing the output.
 The central pixel used in the PV is {xcen}.
 ''', log)
@@ -268,25 +294,33 @@ The central pixel used in the PV is {xcen}.
     if finalsize[0] == -1:
         # then lets update the header
         # As python is stupid making a simple copy will mean that these changes are still applied to hudulist
-        TwoD_hdr['NAXIS2'] = nz
         TwoD_hdr['NAXIS1'] = nx
-
-        TwoD_hdr['CRPIX2'] = hdr['CRPIX3']
         #fit is 1 based
         TwoD_hdr['CRPIX1'] = xcen+1
+        xstart=0
+        xend = nx
     else:
-        zstart = set_limits(int(zcenter-finalsize[1]/2.),0,int(nz))
-        zend = set_limits(int(zcenter+finalsize[1]/2.),0,int(nz))
-        xstart = set_limits(int(xcen-finalsize[0]/2.),0,int(nx))
-        xend = set_limits(int(xcen+finalsize[0]/2.),0,int(nx))
-
-        PV =  PV[zstart:zend, xstart:xend]
-        TwoD_hdr['NAXIS2'] = int(finalsize[1])
+        xstart = set_limits(int(xcen-finalsize[0]/2.),0,int(nx-finalsize[0]))
+        xend = set_limits(int(xcen+finalsize[0]/2.),xstart+int(finalsize[0]),int(nx))
         TwoD_hdr['NAXIS1'] = int(finalsize[0])
-        TwoD_hdr['CRPIX2'] = hdr['CRPIX3']-int(nz/2.-finalsize[1]/2.)
         TwoD_hdr['CRPIX1'] = xcen-xstart+1
 
-
+    if finalsize[1] == -1:
+        TwoD_hdr['NAXIS2'] = nz
+        TwoD_hdr['CRPIX2'] = hdr['CRPIX3']
+        zstart=0
+        zend = nz
+    else:
+        zstart = set_limits(int(zcenter-finalsize[1]/2.),0,int(nz-finalsize[1]))
+        zend = set_limits(int(zcenter+finalsize[1]/2.),zstart+int(finalsize[1]),int(nz))
+        TwoD_hdr['NAXIS2'] = int(finalsize[1])
+        TwoD_hdr['CRPIX2'] = hdr['CRPIX3']-int(nz/2.-finalsize[1]/2.)
+    if debug:
+        log_statement += print_log(f'''EXTRACT_PV: Slicing with the following limits: xstart = {xstart}, xend = {xend}, zstart = {zstart}, zend = {zend}'''
+            ,log)
+    PV =  PV[zstart:zend, xstart:xend]
+    if debug:
+        log_statement += print_log(f'''EXTRACT_PV: The shape after slicing is {PV.shape}''',log)
     TwoD_hdr['CRVAL2'] = hdr['CRVAL3']
     TwoD_hdr['CDELT2'] = hdr['CDELT3']
     TwoD_hdr['CTYPE2'] = hdr['CTYPE3']
@@ -314,7 +348,8 @@ The central pixel used in the PV is {xcen}.
     del (TwoD_hdr['CTYPE3'])
     del (TwoD_hdr['NAXIS3'])
     #del (TwoD_hdr['EPOCH'])
-
+    if 'WCSAXES' in TwoD_hdr:
+        del (TwoD_hdr['WCSAXES'])
     TwoD_hdr['NAXIS'] = 2
     TwoD_hdr['CRVAL1'] = 0.
     #Because we used nx in the linspace for liney we also use it here
@@ -412,6 +447,10 @@ extract_pv.__doc__ = '''
 
     convert=-1
     conversion factor for velocity axis, default no conversion
+
+    thickness=0.
+    width of the strip perpendicular to the slice, in pixels, integrated before the
+    perpendicular axis is discarded. Values > 0 sum over that width.
 
  KEYWORD PARAMETERS:
 
